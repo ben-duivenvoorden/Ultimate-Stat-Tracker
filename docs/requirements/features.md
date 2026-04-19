@@ -80,14 +80,24 @@ Receiver Error and Defensive Block shift the screen to a distinct visual state (
 
 ---
 
-## F7 — Game Time
+## F7 — Half Time
+
+- Half time is triggered automatically when the score reaches the configured threshold
+- The app appends a **Half Time** event to the log — not recorder-triggered
+- At half time: ends switch and possession goes to the team that did not start the game
+- The half time score threshold is a league/tournament-level setting on the server — not set in-app
+- The recorder does not need to do anything — the app handles the transition
+
+---
+
+## F8 — Game Time
 
 - The app records the actual wall-clock start time of the game
 - No countdown timer, no enforced duration
 
 ---
 
-## F8 — Export
+## F9 — Export
 
 - Per-player stats are exportable in-app
 - The server always holds the authoritative copy — the app requests it

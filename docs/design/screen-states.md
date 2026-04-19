@@ -21,6 +21,7 @@
 | 3d | Live Entry — Receiver Error Pick | Receiver Error tapped |
 | 3e | Live Entry — Defensive Block Pick | Defensive Block tapped |
 | 3f | Live Entry — Point Over | Goal tapped |
+| 3g | Live Entry — Half Time | Score threshold reached (automatic) |
 
 ---
 
@@ -100,7 +101,17 @@
 - **Event buttons:** None
 - **Log:** Visible — final state of completed point
 - **Display:** Score updated, brief confirmation of goal scorer
-- **Transition:** Auto or tap → **2a** (Line Selection for next point)
+- **Transition:**
+  - Score < half time threshold → auto or tap → **2a**
+  - Score = half time threshold → system auto-inserts Half Time event → **3g**
+
+### 3g — Half Time
+- **Player zone:** None (or dimmed)
+- **Event buttons:** None
+- **Log:** Visible — Half Time entry appended automatically
+- **Display:** Half time indicator, current score, ends switched notice
+- **Note:** Possession for second half goes to the team that did not start the game — derived automatically
+- **Transition:** Auto or tap → **2a** (Line Selection for second half)
 
 ---
 

@@ -31,6 +31,7 @@ This document defines the event state machine — what actions are valid after e
 | **Receiver Error** | Recorder picks the intended receiver | Screen state change — possession team shown |
 | **Defensive Block** | Recorder picks the defender | Screen state change — defending team shown |
 | **Goal** | Last player with disc (auto) | No extra pick required |
+| **Half Time** | Automatic (system) | Inserted into log when score threshold is reached; not recorder-triggered |
 
 ---
 
@@ -38,10 +39,11 @@ This document defines the event state machine — what actions are valid after e
 
 ```
 LINE_SELECTION → PULLING → PULL_RECORDED → PASS_CHAIN → POINT_OVER → LINE_SELECTION
-                                                ↓
-                                    TURNOVER (possession flips)
-                                                ↓
-                                           PASS_CHAIN
+                                                ↓                           ↓
+                                    TURNOVER (possession flips)     [if half time score]
+                                                ↓                    HALF_TIME (auto event)
+                                           PASS_CHAIN                       ↓
+                                                                     LINE_SELECTION
 ```
 
 ---
@@ -61,7 +63,9 @@ LINE_SELECTION → PULLING → PULL_RECORDED → PASS_CHAIN → POINT_OVER → L
 | BLOCK_PICK | Tap defender name | PASS_CHAIN | Blocker's team now in possession — blocker may be tapped again as first receiver |
 | PASS_CHAIN | Goal | POINT_OVER | Scorer = last receiver; assist/second assist derived from chain |
 | TURNOVER | — | PASS_CHAIN | Possession flips to other team |
-| POINT_OVER | — | LINE_SELECTION | |
+| POINT_OVER | Score < half time threshold | LINE_SELECTION | Normal point transition |
+| POINT_OVER | Score = half time threshold | HALF_TIME (auto) | System inserts Half Time event into log |
+| HALF_TIME | — | LINE_SELECTION | Possession flips to team that did not start the game; ends switch |
 
 ---
 
@@ -76,6 +80,9 @@ LINE_SELECTION → PULLING → PULL_RECORDED → PASS_CHAIN → POINT_OVER → L
 7. All events are append-only to the log — amendments are new entries referencing prior ones
 8. A Defensive Block records the blocker; that same player may immediately be tapped as first receiver (two sequential log entries — valid)
 9. Scorer (Goal), assist, and second assist are all derivable from the pass chain — no explicit entry needed
+10. Half Time is triggered automatically when the score reaches the configured threshold — it is never manually entered
+11. At Half Time, possession goes to the team that did NOT start the game (opposite of the first pull)
+12. The half time score threshold is a league/tournament-level setting configured on the server — not set in-app
 
 ---
 
@@ -93,4 +100,5 @@ LINE_SELECTION → PULLING → PULL_RECORDED → PASS_CHAIN → POINT_OVER → L
 - [ ] How granular is the Receiver Error pick — does the recorder confirm possession flip explicitly?
 - [ ] Do we track stall as a Throw Away subtype (description field) or silently?
 - [ ] Mixed division gender ratio — does the app enforce legal ratio on line selection?
+- [ ] Is the half time score threshold always the same for all games in a league, or can it vary per game?
 - [ ] How are mid-point injury substitutions recorded in the log format?

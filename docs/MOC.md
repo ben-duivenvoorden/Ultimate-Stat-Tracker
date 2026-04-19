@@ -40,6 +40,14 @@
 
 ---
 
+## Research
+
+| Document | What it answers |
+|---|---|
+| [app-landscape.md](research/app-landscape.md) | What other apps exist in the ecosystem and where does this project fit? |
+
+---
+
 ## Pending
 
 | Folder | Status |
