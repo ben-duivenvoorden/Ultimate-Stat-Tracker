@@ -9,7 +9,7 @@
 
 ## Purpose
 
-This document defines the event state machine — what actions are valid after each game event. The UI only ever presents valid next actions based on current state, making invalid sequences structurally impossible.
+This document defines the sequence validation rules — what actions are valid after each game event. The UI only ever presents valid next actions based on current state, making invalid sequences structurally impossible.
 
 ---
 

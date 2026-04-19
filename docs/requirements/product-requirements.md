@@ -56,10 +56,10 @@ Existing Ultimate Frisbee stat apps are either too complex for casual sideline u
 
 - **Game time:** Record actual game start time (wall clock) — not a countdown or enforced timer
 - **Session persistence:** A game has one persistent WebSocket session. Any recorder can leave and rejoin at any time, reconnecting to the same live session with full current state and event log intact
-- **Multiple recorders:** Supported via the WebSocket session model — all clients stay in sync
+- **Live session sharing:** One active editor per session; others can join as live viewers — exact viewer model and editor handoff TBD
 - **Score cap:** Not enforced by the app — the game stops when it stops
 - **Gender indicator:** Player names are colour-coded by gender as a visual indicator only — never enforced or blocked
-- **Device:** Android phone (primary), iPhone (secondary); landscape orientation preferred
+- **Platform:** Web app, native app, or both — TBD. Landscape orientation preferred for sideline use.
 - **Event model:** Tap a player name = that player has possession. Persistent event buttons (Throw Away, Receiver Error, Defensive Block, Goal, Pull, Pull Bonus) interrupt and contextualise the pass chain
 - **Stats tracked:** Pass chain (receivers), Pull / Pull Bonus, Throw Away, Receiver Error, Defensive Block, Goal — fouls and timeouts not recorded
 - **Rosters:** Pre-configured on the server — not entered in-app
@@ -87,6 +87,6 @@ Existing Ultimate Frisbee stat apps are either too complex for casual sideline u
 | [sport-context.md](sport-context.md) | Ultimate Frisbee rules relevant to stat keeping |
 | [features.md](features.md) | Core feature definitions |
 | [screens.md](../design/screens.md) | Screen list and field orientation logic |
-| [validation-rules.md](validation-rules.md) | Event state machine and integrity rules |
+| [validation-rules.md](validation-rules.md) | Sequence validation rules and integrity constraints |
 | [user-stories.md](user-stories.md) | User stories by role |
 

@@ -9,10 +9,9 @@
 
 ## Device & Orientation
 
-- **Primary:** Android phone, landscape
-- **Secondary:** iPhone, landscape
-- Landscape is preferred — maps naturally to the left/right field orientation
-- Orientation is a design flexibility — not locked
+- **Platform:** Web app, native app, or both — TBD
+- **Orientation:** Landscape preferred — maps naturally to the left/right field orientation; not locked
+- Designed for a phone held on the sideline; tablet use also viable
 
 ---
 

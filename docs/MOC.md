@@ -18,7 +18,7 @@
 | [product-requirements.md](requirements/product-requirements.md) | What are we building and why? |
 | [user-stories.md](requirements/user-stories.md) | What does each role need to do? |
 | [features.md](requirements/features.md) | What are the core features? |
-| [validation-rules.md](requirements/validation-rules.md) | What event sequences are legal? (state machine) |
+| [validation-rules.md](requirements/validation-rules.md) | What event sequences are legal? (sequence validation) |
 | [sport-context.md](requirements/sport-context.md) | Ultimate Frisbee rules relevant to stat keeping |
 
 ---

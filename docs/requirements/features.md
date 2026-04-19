@@ -71,11 +71,12 @@ Receiver Error and Defensive Block shift the screen to a distinct visual state (
 
 ---
 
-## F6 — Multi-User Real-Time Recording
+## F6 — Live Session Sharing
 
-- Multiple recorders can connect to the same game session simultaneously
-- All connected clients receive state updates via WebSocket in real time
-- A recorder can leave and rejoin at any time — full state is restored on reconnect
+- One recorder acts as the active editor at any time — only they can submit events
+- Others can join the same session as live viewers — they see the event log update in real time
+- The editor can leave and rejoin at any time — full state is restored on reconnect
+- Exact viewer permissions and editor handoff model are TBD
 - See [architecture.md](architecture.md) for session model detail
 
 ---
