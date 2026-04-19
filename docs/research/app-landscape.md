@@ -11,7 +11,7 @@
 
 ## Verdict
 
-**PenUltimate covered the 2024 Parity League requirements and is the closest functional reference point for this project.** The improvements we want — sequence validation, multi-user WebSocket sync, server-backed rosters, and a more guided low-error UX — are the justification for building something new rather than continuing to use it.
+**PenUltimate covered the 2024 Parity League requirements and is the closest functional reference point for this project.** The improvements we want — sequence validation, multi-user viewer ability/switch scorer, server-backed rosters, and a more guided low-error UX — are the justification for building something new rather than continuing to use it.
 
 Statto is the most impressive app in the space — field position tracking, rich analytics, actively maintained. It costs $15 but the biggest dissapointment is it's only on iOS
 Concerned the pitch diagram entry may be too slow and complex for casual sideline use.
@@ -117,5 +117,5 @@ The main risk is not duplication. It is whether the improvements over PenUltimat
 | Advanced analytics | ❌ export only | ✅ | partial | ❌ | partial | ✅ |
 | Still actively maintained | ✅ | ✅ | ⚠️ | ? | ✅ | ✅ |
 
-¹ *Live session sharing: one editor records; others can watch the session live in real time. Exact viewer model TBD.*
+¹ *Live session sharing: one editor records; others can watch the session live in real time. The editor role can be handed off to another viewer (switch scorer). Exact handoff model TBD.*
 ² *Sequence validation: the UI only presents actions that are legal given the current game state — impossible sequences (e.g. assist and goal on the same player) cannot be entered. Aggregate-only apps have no such constraint.*

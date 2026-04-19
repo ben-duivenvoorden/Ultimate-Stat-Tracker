@@ -75,8 +75,9 @@ Receiver Error and Defensive Block shift the screen to a distinct visual state (
 
 - One recorder acts as the active editor at any time — only they can submit events
 - Others can join the same session as live viewers — they see the event log update in real time
+- The editor role can be handed off to another participant mid-session (switch scorer)
 - The editor can leave and rejoin at any time — full state is restored on reconnect
-- Exact viewer permissions and editor handoff model are TBD
+- Exact viewer permissions and switch scorer handoff model are TBD
 - See [architecture.md](architecture.md) for session model detail
 
 ---

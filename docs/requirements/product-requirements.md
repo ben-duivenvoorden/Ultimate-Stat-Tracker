@@ -56,7 +56,7 @@ Existing Ultimate Frisbee stat apps are either too complex for casual sideline u
 
 - **Game time:** Record actual game start time (wall clock) — not a countdown or enforced timer
 - **Session persistence:** A game has one persistent WebSocket session. Any recorder can leave and rejoin at any time, reconnecting to the same live session with full current state and event log intact
-- **Live session sharing:** One active editor per session; others can join as live viewers — exact viewer model and editor handoff TBD
+- **Live session sharing:** One active editor per session; others can join as live viewers; editor role can be handed off mid-session (switch scorer) — exact model TBD
 - **Score cap:** Not enforced by the app — the game stops when it stops
 - **Gender indicator:** Player names are colour-coded by gender as a visual indicator only — never enforced or blocked
 - **Platform:** Web app, native app, or both — TBD. Landscape orientation preferred for sideline use.
