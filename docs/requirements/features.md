@@ -1,8 +1,8 @@
 # Core Features
 ## Ultimate Stat Tracker
 
-**Version:** 0.2
-**Last Updated:** 2026-04-18
+**Version:** 0.3
+**Last Updated:** 2026-04-19
 **Status:** 🟡 In Progress
 
 ---
@@ -14,53 +14,78 @@
 - Typically 4 men and 3 women per side (Parity League format)
 - Both teams always have equal player counts
 - Player names are **colour-coded by gender** as a visual indicator only — never enforced or blocked
-- The pulling team is derived automatically — the recorder does not select it
+- At game start, the recorder specifies which team pulls first — the only manual pulling team input
+- After the first point, the pulling team is derived automatically from the event log
+- If fewer than 7 players are selected for a side, a warning is shown — the recorder can still confirm
 
 ---
 
 ## F2 — Event Entry
 
-The recorder taps player names and persistent event buttons to build an ordered event log.
+The recorder taps player names to build an ordered event log. Each tap triggers a **player explosion** — a contextual menu that appears from the player, showing only the actions valid in the current game state.
 
-**Core principle:** tapping a player name = that player has possession.
+**Core principle:** tapping a player opens an explosion; centre/dismiss records a pass (that player now has possession).
 
 ### Player Zone
 - Shows only the team currently in possession
-- Each tap records a pass to that receiver
 - Maximum 7 names — always a short, tappable list
 - Names are the baseline; jersey numbers and profile pictures are future enhancements
 
-### Event Buttons
-Visible only when valid for the current game state. Interrupt the pass chain when tapped.
+### Player Explosion
+The explosion appears on player tap and offers state-dependent options:
 
-| Button | Behaviour |
+**During pass chain:**
+
+| Position | Action | Behaviour |
+|---|---|---|
+| Centre / dismiss | Pass | This player now has possession |
+| Left | Receiver Error | This player was the intended receiver but did not gain possession — turnover attributed to them, possession flips |
+| Right | Throw Away | Attributed to the previous disc holder — possession flips |
+| Right | Defensive Block | Screen state change — recorder picks blocker from defending team; possession flips |
+| Right | Goal | Closes the point — attributed to this player; assist chain derived from log |
+
+**At point start (after puller is tapped):**
+
+| Position | Action | Behaviour |
+|---|---|---|
+| Right | Pull | Records the pull — possession flips to receiving team |
+| Right | Pull Bonus | Records a bonus-distance pull — possession flips |
+
+Pull and Pull Bonus are the only valid options at point start — no pass option is shown.
+
+### Event Button (Special Events)
+A persistent **Event** button on screen opens a submenu for rare or game-level events outside the normal pass chain:
+
+| Submenu Item | Behaviour |
 |---|---|
-| **Pull / Pull Bonus** | Only available at point start — recorder taps puller name first, then this button |
-| **Throw Away** | Attributed automatically to last player with disc — no extra pick |
-| **Receiver Error** | Screen state change — recorder picks the intended receiver from possession team |
-| **Defensive Block** | Screen state change — recorder picks the blocker from defending team; possession flips |
-| **Goal** | Closes the point — attributed automatically to last player with disc; assist chain derived from log |
+| Injury Sub | Opens Line Selection (mid-point) for the affected team |
+| Half Time | Manual trigger — switches ends and possession; same behaviour as the automatic half time event. Available as an override for time-based formats or when auto-trigger is not configured. |
+| End Game | Marks the end of the game — no further log entries are permitted. Export becomes available. Suggested by the app when the score cap is reached (league/tournament config); recorder confirms. The app does not enforce the score cap — the recorder decides when the game is over. |
 
 ### Screen State Changes
-Receiver Error and Defensive Block shift the screen to a distinct visual state (colour change or overlay) so the recorder knows they are picking a turnover player, not continuing the pass chain.
+**Defensive Block** is the only event that shifts the screen to a distinct visual state — the recorder picks the blocker from the defending team before returning to the pass chain. **Receiver Error** is resolved within the explosion itself (no separate pick screen required).
 
 ---
 
 ## F3 — Live Event Log
 
-- The full event log is always visible on the Live Event Entry screen
-- The recorder can verify the last few entries at a glance
-- The log is the single source of truth — all stats are derived from it
-- Editing experience is a known unknown — deferred to UX design phase
+There are two representations of the event log:
+
+- **Raw log:** append-only, never mutated. Every event — including amendments and reversals — is stored in insertion order. This is the authoritative record.
+- **Visual log:** derived from the raw log. Reflects the current "truth" after all amendments are applied. This is what the recorder sees on screen.
+
+The visual log is always visible on the Live Event Entry screen. All stats are derived from the visual log.
 
 ---
 
 ## F4 — Amend / Undo
 
-- A recorder can correct a prior entry at any time during the game
-- An amendment is **appended** to the event log — it does not mutate or delete history
-- An amendment is only accepted if the resulting event sequence remains valid
-- Invalid amendments are rejected by the server
+- The raw log is **never edited** — all corrections are new entries appended to it in insertion order
+- Amendment entries carry a **target position** — specifying where in the visual log they should appear. The visual log is compiled by ordering entries according to their target positions, not raw insertion order.
+- An **undo** appends a reversal of the last visual log entry; the visual log updates immediately
+- An **edit** lets the recorder select one or more visual log entries to remove or reorder; each correction is appended to the raw log with a target position
+- A correction is accepted only if the resulting visual sequence is valid — otherwise the entire change is rejected; the recorder must resolve it before exiting edit mode
+- The server validates all corrections; invalid sequences are rejected
 
 ---
 
@@ -77,6 +102,7 @@ Receiver Error and Defensive Block shift the screen to a distinct visual state (
 - Others can join the same session as live viewers — they see the event log update in real time
 - The editor role can be handed off to another participant mid-session (switch scorer)
 - The editor can leave and rejoin at any time — full state is restored on reconnect
+- If the editor disconnects, live viewer screens remain visible but stagnant — no new events appear until the editor reconnects or the role is handed off
 - Exact viewer permissions and switch scorer handoff model are TBD
 - See [architecture.md](architecture.md) for session model detail
 
@@ -115,3 +141,4 @@ Receiver Error and Defensive Block shift the screen to a distinct visual state (
 | Player stats view | Player filters their own stats from the log — Phase 2+ |
 | Jersey numbers | Optional display enhancement on player name buttons |
 | Profile pictures | Optional display enhancement on player name buttons |
+| ABBA gender point tracking | If enabled in settings, the app advises on whether the current point should be a men's or women's ratio point (e.g. 4M/3W vs 3M/4W), following the ABBA alternating pattern. Requires the recorder to confirm the starting gender point at game start. Only applicable when the team has enough players of both genders — advisory only, never enforced. Phase 2+. |

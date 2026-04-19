@@ -57,13 +57,14 @@ Existing Ultimate Frisbee stat apps are either too complex for casual sideline u
 - **Game time:** Record actual game start time (wall clock) — not a countdown or enforced timer
 - **Session persistence:** A game has one persistent WebSocket session. Any recorder can leave and rejoin at any time, reconnecting to the same live session with full current state and event log intact
 - **Live session sharing:** One active editor per session; others can join as live viewers; editor role can be handed off mid-session (switch scorer) — exact model TBD
-- **Score cap:** Not enforced by the app — the game stops when it stops
+- **Score cap / half time threshold:** Not enforced by the app — both are league/tournament-level settings configured on the server. The app suggests Half Time and End Game to the recorder when the score is reached; the recorder confirms.
+- **End Game:** Recorder-triggered via the Event button — marks the point at which no more log entries should be made. The log represents what actually happened; End Game does not alter it.
 - **Gender indicator:** Player names are colour-coded by gender as a visual indicator only — never enforced or blocked
 - **Platform:** Web app, native app, or both — TBD. Landscape orientation preferred for sideline use.
-- **Event model:** Tap a player name = that player has possession. Persistent event buttons (Throw Away, Receiver Error, Defensive Block, Goal, Pull, Pull Bonus) interrupt and contextualise the pass chain
+- **Event model:** Tapping a player opens a contextual explosion — centre/dismiss records a pass; left = Receiver Error; right = Throw Away / Defensive Block / Goal / Pull / Pull Bonus (state-dependent)
 - **Stats tracked:** Pass chain (receivers), Pull / Pull Bonus, Throw Away, Receiver Error, Defensive Block, Goal — fouls and timeouts not recorded
 - **Rosters:** Pre-configured on the server — not entered in-app
-- **Pulling team:** Derived automatically from the event log — never set manually
+- **Pulling team:** Derived from the event log after the first point. At game start, the recorder specifies which team pulls first — this is the only manual input for pulling team.
 - **Player stats view:** Deferred to Phase 2+
 
 ---
