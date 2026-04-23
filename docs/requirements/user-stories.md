@@ -1,8 +1,8 @@
 # User Stories
 ## Ultimate Stat Tracker
 
-**Version:** 0.1 (Phase 0 — Requirements Gathering)
-**Last Updated:** 2026-04-17
+**Version:** 0.2 (Phase 0 — Requirements Gathering)
+**Last Updated:** 2026-04-23
 **Status:** 🟡 In Progress
 
 ---
@@ -10,6 +10,8 @@
 ## Sideline Recorder
 
 - As a sideline recorder, I want to load a pre-built roster so I don't have to enter player names manually before a game.
+- As a sideline recorder, I want to take photos of players before the game so I can identify unfamiliar players quickly during live play.
+- As a sideline recorder, I want each player button to show a recognisable photo or clear fallback so I can tap the right player without knowing their name.
 - As a sideline recorder, I want to select which players are on the field at the start of each point so the app knows who is active.
 - As a sideline recorder, I want to see only valid next actions after each event so I can't accidentally record an impossible sequence.
 - As a sideline recorder, I want to record a stat in as few taps as possible so I don't miss live action.

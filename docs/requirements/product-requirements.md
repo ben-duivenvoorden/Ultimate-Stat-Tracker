@@ -1,8 +1,8 @@
 # Product Requirements Document
 ## Ultimate Stat Tracker
 
-**Version:** 0.3 (Phase 0 — Requirements Gathering)
-**Last Updated:** 2026-04-17
+**Version:** 0.4 (Phase 0 — Requirements Gathering)
+**Last Updated:** 2026-04-23
 **Status:** 🟡 In Progress
 
 ---
@@ -66,13 +66,15 @@ Existing Ultimate Frisbee stat apps are either too complex for casual sideline u
 - **Rosters:** Pre-configured on the server — not entered in-app
 - **Pulling team:** Derived from the event log after the first point. At game start, the recorder specifies which team pulls first — this is the only manual input for pulling team.
 - **Player stats view:** Deferred to Phase 2+
+- **Both teams recorded:** Phase 1 records stats for both teams — confirmed decision, not configurable
+- **Player profile photos:** Each player is displayed as a circular profile photo (MS Teams style). Fallback hierarchy: jersey number in circle → short name without circle (nickname preferred; otherwise first name + surname initial). Pre-game photo capture is supported in-app so the recorder can identify unfamiliar players before the game starts.
 
 ---
 
 ## 7. Open Questions
 
 - [ ] What specific per-player stats are needed for Parity League GM decisions?
-- [ ] Do we track both teams' stats or just one?
+- [x] ~~Do we track both teams' stats or just one?~~ Both teams — confirmed Phase 1 decision
 - [ ] What is the exact export format required?
 - [ ] What is the roster size range (min/max players per team)?
 - [ ] How is multi-user conflict handled if two recorders submit simultaneously?

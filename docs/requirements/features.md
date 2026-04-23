@@ -1,8 +1,8 @@
 # Core Features
 ## Ultimate Stat Tracker
 
-**Version:** 0.3
-**Last Updated:** 2026-04-19
+**Version:** 0.4
+**Last Updated:** 2026-04-23
 **Status:** 🟡 In Progress
 
 ---
@@ -29,7 +29,7 @@ The recorder taps player names to build an ordered event log. Each tap triggers 
 ### Player Zone
 - Shows only the team currently in possession
 - Maximum 7 names — always a short, tappable list
-- Names are the baseline; jersey numbers and profile pictures are future enhancements
+- Player identity is displayed as a profile photo in a circle (see F10)
 
 ### Player Explosion
 The explosion appears on player tap and offers state-dependent options:
@@ -134,11 +134,41 @@ The visual log is always visible on the Live Event Entry screen. All stats are d
 
 ---
 
+---
+
+## F10 — Player Profile Photos
+
+Profile photos are critical for usability when the recorder does not know the players — particularly when scoring for both teams (Phase 1 default; see below).
+
+### Display
+- Each player is shown as a **circular profile photo** (similar to Microsoft Teams avatars)
+- Photos are displayed wherever players are listed: Line Selection, Player Zone, and the player explosion
+
+### Fallback hierarchy
+If a photo is unavailable or fails to load, the display degrades gracefully in order:
+
+1. **Jersey number** — displayed inside the circle in place of the photo
+2. **Short name** — circle removed; displays the player's configured unique short name. Short name preference order: nickname → first name + surname initial (e.g. "Ben D")
+
+### Pre-game photo capture
+- The recorder can take photos of players before the game starts
+- This is especially important when scoring both teams (see below), where the recorder may not know either roster
+
+### Scoring both teams
+- Phase 1 records stats for **both teams** — this is a confirmed decision, not configurable
+- The profile photo system is designed to support this: the recorder must be able to identify all players from both rosters at a glance
+
+### Photo management
+- Photos are associated with player records on the server
+- Pre-game capture uploads to the server and is immediately available to all session participants
+- Photo association (which player a captured photo belongs to) is confirmed by the recorder at capture time
+
+---
+
 ## Deferred Features
 
 | Feature | Notes |
 |---|---|
 | Player stats view | Player filters their own stats from the log — Phase 2+ |
-| Jersey numbers | Optional display enhancement on player name buttons |
-| Profile pictures | Optional display enhancement on player name buttons |
+| Jersey numbers | Optional display enhancement — Phase 1 fallback within photo circle (see F10) |
 | ABBA gender point tracking | If enabled in settings, the app advises on whether the current point should be a men's or women's ratio point (e.g. 4M/3W vs 3M/4W), following the ABBA alternating pattern. Requires the recorder to confirm the starting gender point at game start. Only applicable when the team has enough players of both genders — advisory only, never enforced. Phase 2+. |
