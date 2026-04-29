@@ -56,9 +56,6 @@ export default function LiveEntry() {
     onBackToGames:        actions.backToGameList,
   }
 
-  const attackingTeam = teams[state.attackLeft]
-  const defendingTeam = teams[otherTeam(state.attackLeft)]
-
   // Action pane is the sliding overlay — it always covers the inactive team.
   // Layout columns: [Team A | Team B | Log]
   //   Team A active → action covers Team B (centre) → translateX(100%)
@@ -66,12 +63,6 @@ export default function LiveEntry() {
   const actionTranslateX = activeTeam === 'A' ? '100%' : '0%'
 
   const sharedPlayerPaneProps = {
-    scoreA:       state.score.A,
-    scoreB:       state.score.B,
-    teamAColor:   teams.A.color,
-    teamBColor:   teams.B.color,
-    teamAShort:   teams.A.short,
-    teamBShort:   teams.B.short,
     discHolderId: state.discHolder,
     selPullerId:  ui.selPuller,
     onTap:        actions.tapPlayer,
@@ -79,22 +70,24 @@ export default function LiveEntry() {
 
   return (
     <div className="h-full flex flex-col bg-bg">
-      {/* Field direction cue */}
+      {/* Top bar — back button + centred scoreboard */}
       <div
-        className="flex-shrink-0 flex items-center justify-between px-4 h-6 text-[9px] font-mono tracking-widest"
-        style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-dim)' }}
+        className="flex-shrink-0 flex items-center justify-between px-3 h-12"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
       >
         <button
           onClick={backToGameList}
-          className="text-muted hover:text-content transition-colors cursor-pointer"
+          className="text-muted hover:text-content transition-colors cursor-pointer text-lg leading-none"
           title="Back to games"
         >
           ←
         </button>
-        <div className="flex-1 flex items-center justify-center gap-6">
-          <span style={{ color: attackingTeam.color }}>{attackingTeam.short} ←</span>
-          <span>ATTACKING →</span>
-          <span style={{ color: defendingTeam.color }}>→ {defendingTeam.short}</span>
+        <div className="flex-1 flex items-center justify-center gap-3">
+          <span className="text-sm font-bold" style={{ color: teams.A.color }}>{teams.A.short}</span>
+          <strong className="text-3xl font-black tabular-nums leading-none text-content">{state.score.A}</strong>
+          <span className="text-dim text-base">–</span>
+          <strong className="text-3xl font-black tabular-nums leading-none text-content">{state.score.B}</strong>
+          <span className="text-sm font-bold" style={{ color: teams.B.color }}>{teams.B.short}</span>
         </div>
         <div className="w-5" />
       </div>

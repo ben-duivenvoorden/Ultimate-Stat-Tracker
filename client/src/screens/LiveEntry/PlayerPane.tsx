@@ -9,12 +9,6 @@ interface PlayerPaneProps {
   players: Player[]
   teamColor: string
   teamShort: string
-  scoreA: number
-  scoreB: number
-  teamAColor: string
-  teamBColor: string
-  teamAShort: string
-  teamBShort: string
 
   mode: PlayerPaneMode
   discHolderId: string | null
@@ -38,7 +32,6 @@ interface DragState { fromIdx: number; targetIdx: number; deltaY: number }
 
 export function PlayerPane({
   players, teamColor, teamShort,
-  scoreA, scoreB, teamAShort, teamBShort, teamAColor, teamBColor,
   mode, discHolderId, selPullerId, align,
   onTap, onReorder,
 }: PlayerPaneProps) {
@@ -84,7 +77,7 @@ export function PlayerPane({
       style={{ background: bg }}
     >
       <div
-        className="flex-shrink-0 h-7 flex items-center justify-between px-2"
+        className="flex-shrink-0 h-7 flex items-center px-2"
         style={{
           borderBottom: `1px solid ${accent ? `${accent}33` : 'var(--color-border)'}`,
           flexDirection: isRight ? 'row-reverse' : 'row',
@@ -100,17 +93,6 @@ export function PlayerPane({
           <div className="text-[11px] font-bold leading-none" style={{ color: accent ?? teamColor }}>
             {teamShort}
           </div>
-        </div>
-
-        <div
-          className="flex items-center gap-1 text-[10px]"
-          style={{ flexDirection: isRight ? 'row-reverse' : 'row' }}
-        >
-          <span className="font-bold" style={{ color: teamAColor }}>{teamAShort}</span>
-          <strong className="text-[15px] font-black text-content">{scoreA}</strong>
-          <span className="text-dim text-[9px]">–</span>
-          <strong className="text-[15px] font-black text-content">{scoreB}</strong>
-          <span className="font-bold" style={{ color: teamBColor }}>{teamBShort}</span>
         </div>
       </div>
 
