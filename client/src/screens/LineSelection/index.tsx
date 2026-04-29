@@ -81,11 +81,9 @@ export default function LineSelection() {
           label={teams.A.name}
           onToggle={p => toggle(p, selA, setSelA)}
           onSetAll={setSelA}
-          divider
           gameMode={gameMode}
           targetM={lineRatio.M}
           targetF={lineRatio.F}
-          validation={validateA}
         />
         <TeamColumn
           players={rosters.B}
@@ -94,10 +92,10 @@ export default function LineSelection() {
           label={teams.B.name}
           onToggle={p => toggle(p, selB, setSelB)}
           onSetAll={setSelB}
+          align="right"
           gameMode={gameMode}
           targetM={lineRatio.M}
           targetF={lineRatio.F}
-          validation={validateB}
         />
       </div>
 
@@ -154,17 +152,17 @@ interface TeamColumnProps {
   label: string
   onToggle: (p: Player) => void
   onSetAll: (next: Player[]) => void
-  divider?: boolean
+  align?: 'right'
   gameMode: GameMode
   targetM: number
   targetF: number
-  validation: LineValidation
 }
 
 function TeamColumn({
-  players, selected, color, label, onToggle, onSetAll, divider,
-  gameMode, targetM, targetF, validation,
+  players, selected, color, label, onToggle, onSetAll, align,
+  gameMode, targetM, targetF,
 }: TeamColumnProps) {
+  const isRight = align === 'right'
   const total  = selected.length
   const countM = selected.filter(p => p.gender === 'M').length
   const countF = selected.filter(p => p.gender === 'F').length
@@ -178,17 +176,13 @@ function TeamColumn({
       : 'var(--color-muted)'
 
   return (
-    <div className={`flex-1 flex flex-col ${divider ? 'border-r border-border' : ''}`}>
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border flex-shrink-0">
-        <span className="text-sm font-bold flex-1" style={{ color }}>{label}</span>
-        {gameMode === 'mixed' ? (
-          <>
-            <Chip color={chipColor(countM, targetM)}>M {countM}/{targetM}</Chip>
-            <Chip color={chipColor(countF, targetF)}>F {countF}/{targetF}</Chip>
-          </>
-        ) : (
-          <Chip color={chipColor(total, target)}>{total}/{target}</Chip>
-        )}
+    <div className={`flex-1 flex flex-col ${!isRight ? 'border-r border-border' : ''}`}>
+      {/* Team header — All/None on the outside (above the ticks), chips + team name
+          bunched toward the centre divider. Single row for both halves. */}
+      <div
+        className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border flex-shrink-0"
+        style={{ flexDirection: isRight ? 'row-reverse' : 'row' }}
+      >
         <button
           type="button"
           onClick={() => onSetAll(allSelected ? [] : players)}
@@ -202,16 +196,22 @@ function TeamColumn({
         >
           {allSelected ? 'None' : 'All'}
         </button>
-      </div>
 
-      {!validation.ok && (
         <div
-          className="px-3 py-1.5 text-[11px] font-mono"
-          style={{ background: 'var(--color-warn-bg)', color: 'var(--color-warn)', borderBottom: '1px solid var(--color-border)' }}
+          className="flex items-center gap-2"
+          style={{ flexDirection: isRight ? 'row-reverse' : 'row' }}
         >
-          {validation.warnings.join(' · ')}
+          {gameMode === 'mixed' ? (
+            <>
+              <Chip color={chipColor(countM, targetM)}>M {countM}/{targetM}</Chip>
+              <Chip color={chipColor(countF, targetF)}>F {countF}/{targetF}</Chip>
+            </>
+          ) : (
+            <Chip color={chipColor(total, target)}>{total}/{target}</Chip>
+          )}
+          <span className="text-sm font-bold" style={{ color }}>{label}</span>
         </div>
-      )}
+      </div>
 
       <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">
         {players.map(p => {
@@ -220,10 +220,11 @@ function TeamColumn({
             <button
               key={p.id}
               onClick={() => onToggle(p)}
-              className="flex items-center gap-2.5 h-10 px-3 rounded-lg border text-left cursor-pointer transition-all"
+              className="flex items-center gap-2.5 h-10 px-3 rounded-lg border cursor-pointer transition-all"
               style={{
                 background:  isOn ? `${color}18` : 'var(--color-surf-2)',
                 borderColor: isOn ? `${color}55` : 'var(--color-border)',
+                flexDirection: isRight ? 'row-reverse' : 'row',
               }}
             >
               <span
@@ -244,10 +245,14 @@ function TeamColumn({
                   {p.gender}
                 </span>
               )}
-              <span className="text-sm flex-1" style={{
-                fontWeight: isOn ? 600 : 400,
-                color: isOn ? 'var(--color-content)' : 'var(--color-muted)',
-              }}>
+              <span
+                className="text-sm flex-1"
+                style={{
+                  fontWeight: isOn ? 600 : 400,
+                  color: isOn ? 'var(--color-content)' : 'var(--color-muted)',
+                  textAlign: isRight ? 'right' : 'left',
+                }}
+              >
                 {p.jerseyNumber !== undefined && (
                   <span className="font-mono mr-1.5" style={{ color: 'var(--color-dim)' }}>
                     #{p.jerseyNumber}
