@@ -13,26 +13,26 @@ const EXT = team('B', 'Extinction',  'EXT', '#ff6640')
 
 const BRI_ROSTER: Player[] = [
   player('a1', 'Sam W',     'A', 'https://i.pravatar.cc/40?img=1'),
-  player('a2', 'Jordan K',  'A'),
+  player('a2', 'Jordan K',  'A', 'https://i.pravatar.cc/40?img=2'),
   player('a3', 'Mia T',     'A', 'https://i.pravatar.cc/40?img=5'),
-  player('a4', 'Lachlan B', 'A'),
-  player('a5', 'Priya S',   'A'),
+  player('a4', 'Lachlan B', 'A', 'https://i.pravatar.cc/40?img=3'),
+  player('a5', 'Priya S',   'A', 'https://i.pravatar.cc/40?img=6'),
   player('a6', 'Tom H',     'A', 'https://i.pravatar.cc/40?img=12'),
   player('a7', 'Evie R',    'A', 'https://i.pravatar.cc/40?img=9'),
-  player('a8', 'Kai M',     'A'),
+  player('a8', 'Kai M',     'A', 'https://i.pravatar.cc/40?img=7'),
   player('a9', 'Dana F',    'A', 'https://i.pravatar.cc/40?img=14'),
 ]
 
 const EXT_ROSTER: Player[] = [
-  player('b1', 'Callum D',  'B'),
+  player('b1', 'Callum D',  'B', 'https://i.pravatar.cc/40?img=18'),
   player('b2', 'Jess O',    'B', 'https://i.pravatar.cc/40?img=17'),
-  player('b3', 'Marcus L',  'B'),
+  player('b3', 'Marcus L',  'B', 'https://i.pravatar.cc/40?img=19'),
   player('b4', 'Tara N',    'B', 'https://i.pravatar.cc/40?img=21'),
-  player('b5', 'Flynn M',   'B'),
+  player('b5', 'Flynn M',   'B', 'https://i.pravatar.cc/40?img=20'),
   player('b6', 'Soph C',    'B', 'https://i.pravatar.cc/40?img=25'),
-  player('b7', 'Rhys P',    'B'),
+  player('b7', 'Rhys P',    'B', 'https://i.pravatar.cc/40?img=26'),
   player('b8', 'Ava G',     'B', 'https://i.pravatar.cc/40?img=29'),
-  player('b9', 'Zane T',    'B'),
+  player('b9', 'Zane T',    'B', 'https://i.pravatar.cc/40?img=30'),
 ]
 
 export const MOCK_GAMES: GameConfig[] = [
