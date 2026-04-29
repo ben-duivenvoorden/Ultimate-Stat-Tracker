@@ -37,7 +37,6 @@ export default function LineSelection() {
     }
   }
 
-  const target = lineRatio.M + lineRatio.F
   const validateA = validateLine(selA, gameMode, lineRatio)
   const validateB = validateLine(selB, gameMode, lineRatio)
   const linesValid = validateA.ok && validateB.ok
@@ -50,12 +49,6 @@ export default function LineSelection() {
     }
   }
 
-  const headerSummary = isInjurySub
-    ? 'Swap any players, then confirm'
-    : gameMode === 'open'
-      ? `Pick ${target} players per team`
-      : `Pick ${lineRatio.M} male-matching and ${lineRatio.F} female-matching per team (${target} total)`
-
   return (
     <div className="h-full flex flex-col bg-bg text-content">
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-border">
@@ -67,26 +60,32 @@ export default function LineSelection() {
           ←
         </button>
         <div className="flex-1">
-          <Label block className="mb-0.5">
+          <Label block>
             {isInjurySub ? 'INJURY SUBSTITUTION — MID-POINT' : 'LINE SELECTION'}
           </Label>
-          <div className="text-sm font-bold">{headerSummary}</div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={toggleSwap}
-            className="text-muted hover:text-content transition-colors cursor-pointer text-base leading-none px-2"
-            title="Swap team sides"
-          >
-            ⇆
-          </button>
           <Btn variant="primary" size="md" onClick={onConfirmClick}>
-            {isInjurySub ? 'Confirm Substitutions' : 'Confirm Line →'}
+            {isInjurySub ? 'Confirm Substitutions' : 'Confirm Line'}
           </Btn>
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Swap-sides toggle, centred between the two team names. */}
+        <button
+          onClick={toggleSwap}
+          className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 w-8 h-8 rounded-full border flex items-center justify-center text-base leading-none transition-colors cursor-pointer"
+          style={{
+            background:  'var(--color-surf-2)',
+            borderColor: 'var(--color-border-2)',
+            color:       'var(--color-muted)',
+          }}
+          title="Swap team sides"
+        >
+          ⇆
+        </button>
+
         <TeamColumn
           players={rosters[swapSides ? 'B' : 'A']}
           selected={swapSides ? selB : selA}
