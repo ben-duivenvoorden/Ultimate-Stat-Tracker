@@ -7,9 +7,10 @@ import { useGameStore } from '@/core/store'
 import type { Player } from '@/core/types'
 
 export default function LineSelection() {
-  const session     = useSession()
-  const isInjurySub = useGameStore(s => s.isInjurySub)
-  const confirmLine = useGameStore(s => s.confirmLine)
+  const session        = useSession()
+  const isInjurySub    = useGameStore(s => s.isInjurySub)
+  const confirmLine    = useGameStore(s => s.confirmLine)
+  const backToGameList = useGameStore(s => s.backToGameList)
 
   const rosters    = session?.gameConfig.rosters
   const teams      = session?.gameConfig.teams
@@ -35,12 +36,19 @@ export default function LineSelection() {
   return (
     <div className="h-full flex flex-col bg-bg text-content">
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-border">
-        <div>
+        <button
+          onClick={backToGameList}
+          className="text-muted hover:text-content transition-colors cursor-pointer"
+          title="Back to games"
+        >
+          ←
+        </button>
+        <div className="flex-1">
           <Label block className="mb-0.5">
             {isInjurySub ? 'INJURY SUBSTITUTION — MID-POINT' : 'LINE SELECTION'}
           </Label>
           <div className="text-sm font-bold">
-            {isInjurySub ? 'Swap one player, then confirm' : 'Pick up to 7 _New Changes players per team'}
+            {isInjurySub ? 'Swap one player, then confirm' : 'Pick up to 7 players per team'}
           </div>
         </div>
         <div className="flex items-center gap-2">
