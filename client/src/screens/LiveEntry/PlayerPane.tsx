@@ -30,6 +30,14 @@ function paneMeta(mode: PlayerPaneMode): PaneMeta {
 
 interface DragState { fromIdx: number; targetIdx: number; deltaY: number }
 
+/** First-letter-of-first-and-last-name initials, or first two letters of a single name. */
+function initialsOf(name: string): string {
+  const parts = name.split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
 export function PlayerPane({
   players, teamColor, teamShort,
   mode, discHolderId, selPullerId, align,
@@ -150,6 +158,7 @@ export function PlayerPane({
                   paddingRight: isRight ? undefined : 24,
                 }}
               >
+                {/* Avatar: real photo → jersey number in circle → initials in circle */}
                 {p.photoUrl ? (
                   <img
                     src={p.photoUrl}
@@ -158,22 +167,19 @@ export function PlayerPane({
                     style={{ border: `1.5px solid ${isIneligible ? 'var(--color-border)' : isPickMode ? activeColor : isHighlit ? teamColor : 'var(--color-border-2)'}` }}
                   />
                 ) : (
-                  <span
-                    className="w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors"
-                    style={{ background: isIneligible ? 'var(--color-border)' : isPickMode ? activeColor : isHighlit ? teamColor : 'var(--color-border)' }}
-                  />
+                  <div
+                    className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center font-bold leading-none"
+                    style={{
+                      background: teamColor,
+                      color: '#fff',
+                      border: `1.5px solid ${isIneligible ? 'var(--color-border)' : isPickMode ? activeColor : isHighlit ? teamColor : 'var(--color-border-2)'}`,
+                      fontSize: p.jerseyNumber !== undefined ? '11px' : '9px',
+                    }}
+                  >
+                    {p.jerseyNumber !== undefined ? p.jerseyNumber : initialsOf(p.name)}
+                  </div>
                 )}
-                <span className="text-sm leading-none">
-                  {p.jerseyNumber !== undefined && (
-                    <span
-                      className="font-mono mr-1.5"
-                      style={{ color: isIneligible ? 'var(--color-dim)' : 'var(--color-muted)' }}
-                    >
-                      #{p.jerseyNumber}
-                    </span>
-                  )}
-                  {p.name}
-                </span>
+                <span className="text-sm leading-none">{p.name}</span>
               </button>
               {onReorder && (
                 <span

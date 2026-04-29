@@ -177,30 +177,29 @@ function TeamColumn({
 
   return (
     <div className={`flex-1 flex flex-col ${!isRight ? 'border-r border-border' : ''}`}>
-      {/* Team header — All/None on the outside (above the ticks), chips + team name
-          bunched toward the centre divider. Single row for both halves. */}
+      {/* Team header — All/None + count chips grouped on the outside (above the ticks),
+          team name bunched toward the centre divider. */}
       <div
         className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border flex-shrink-0"
         style={{ flexDirection: isRight ? 'row-reverse' : 'row' }}
       >
-        <button
-          type="button"
-          onClick={() => onSetAll(allSelected ? [] : players)}
-          className="text-[10px] font-mono uppercase tracking-widest px-2 h-5 rounded border cursor-pointer transition-colors"
-          style={{
-            color: 'var(--color-muted)',
-            borderColor: 'var(--color-border)',
-            background: 'transparent',
-          }}
-          title={allSelected ? 'Deselect all' : 'Select all'}
-        >
-          {allSelected ? 'None' : 'All'}
-        </button>
-
         <div
           className="flex items-center gap-2"
           style={{ flexDirection: isRight ? 'row-reverse' : 'row' }}
         >
+          <button
+            type="button"
+            onClick={() => onSetAll(allSelected ? [] : players)}
+            className="text-xs font-mono uppercase tracking-widest px-2.5 h-7 rounded border cursor-pointer transition-colors"
+            style={{
+              color: 'var(--color-muted)',
+              borderColor: 'var(--color-border)',
+              background: 'transparent',
+            }}
+            title={allSelected ? 'Deselect all' : 'Select all'}
+          >
+            {allSelected ? 'None' : 'All'}
+          </button>
           {gameMode === 'mixed' ? (
             <>
               <Chip color={chipColor(countM, targetM)}>M {countM}/{targetM}</Chip>
@@ -209,26 +208,28 @@ function TeamColumn({
           ) : (
             <Chip color={chipColor(total, target)}>{total}/{target}</Chip>
           )}
-          <span className="text-sm font-bold" style={{ color }}>{label}</span>
         </div>
+
+        <span className="text-base font-bold" style={{ color }}>{label}</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">
+      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
         {players.map(p => {
           const isOn = !!selected.find(s => s.id === p.id)
           return (
             <button
               key={p.id}
               onClick={() => onToggle(p)}
-              className="flex items-center gap-2.5 h-10 px-3 rounded-lg border cursor-pointer transition-all"
+              className="flex items-center gap-3 h-13 px-4 rounded-lg border cursor-pointer transition-all"
               style={{
                 background:  isOn ? `${color}18` : 'var(--color-surf-2)',
                 borderColor: isOn ? `${color}55` : 'var(--color-border)',
                 flexDirection: isRight ? 'row-reverse' : 'row',
+                height: 52,
               }}
             >
               <span
-                className="flex-shrink-0 w-4 h-4 rounded flex items-center justify-center text-[10px] text-white border transition-all"
+                className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center text-sm text-white border transition-all"
                 style={{
                   background:  isOn ? color : 'transparent',
                   borderColor: isOn ? color : 'var(--color-dim)',
@@ -238,7 +239,7 @@ function TeamColumn({
               </span>
               {gameMode === 'mixed' && (
                 <span
-                  className="flex-shrink-0 w-4 text-center text-[10px] font-mono"
+                  className="flex-shrink-0 w-5 text-center text-xs font-mono font-bold"
                   style={{ color: p.gender === 'F' ? 'var(--color-warn)' : 'var(--color-muted)' }}
                   title={p.gender === 'F' ? 'Female-matching' : 'Male-matching'}
                 >
@@ -246,19 +247,25 @@ function TeamColumn({
                 </span>
               )}
               <span
-                className="text-sm flex-1"
+                className="text-lg flex-1"
                 style={{
                   fontWeight: isOn ? 600 : 400,
                   color: isOn ? 'var(--color-content)' : 'var(--color-muted)',
                   textAlign: isRight ? 'right' : 'left',
                 }}
               >
-                {p.jerseyNumber !== undefined && (
-                  <span className="font-mono mr-1.5" style={{ color: 'var(--color-dim)' }}>
+                {/* Jersey number sits on the centre-divider side of the name. */}
+                {isRight && p.jerseyNumber !== undefined && (
+                  <span className="font-mono mr-2 text-base" style={{ color: 'var(--color-dim)' }}>
                     #{p.jerseyNumber}
                   </span>
                 )}
                 {p.name}
+                {!isRight && p.jerseyNumber !== undefined && (
+                  <span className="font-mono ml-2 text-base" style={{ color: 'var(--color-dim)' }}>
+                    #{p.jerseyNumber}
+                  </span>
+                )}
               </span>
             </button>
           )

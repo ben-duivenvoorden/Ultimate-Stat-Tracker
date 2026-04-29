@@ -14,7 +14,7 @@ export interface PickModeConfig {
   paneLabel: string
   /** Full instruction shown in the ActionPane context strip. */
   contextLabel: string | ((ctx: { defendingShort: string }) => string)
-  /** Display name for the PickModePlaceholder badge (e.g. "Defensive Block"). */
+  /** Display name for the PickModePlaceholder badge (e.g. "Blocked by Defence"). */
   displayName: string
   /** Accent color (CSS var). */
   color: string
@@ -28,7 +28,7 @@ export const PICK_MODES = {
   'block-pick': {
     paneLabel:    'PICK BLOCKER',
     contextLabel: ({ defendingShort }) => `PICK BLOCKER FROM ${defendingShort}`,
-    displayName:  'Defensive Block',
+    displayName:  'Blocked by Defence',
     color:        'var(--color-block)',
     bgColor:      'var(--color-block-bg)',
     onTap:        { kind: 'record', eventType: 'block', team: 'defending' },
@@ -36,7 +36,7 @@ export const PICK_MODES = {
   'intercept-pick': {
     paneLabel:    'PICK INTERCEPTOR',
     contextLabel: ({ defendingShort }) => `PICK INTERCEPTOR FROM ${defendingShort}`,
-    displayName:  'Defensive Intercept',
+    displayName:  'Intercepted by Defence',
     color:        'var(--color-intercept)',
     bgColor:      'var(--color-intercept-bg)',
     onTap:        { kind: 'record', eventType: 'intercept', team: 'defending' },

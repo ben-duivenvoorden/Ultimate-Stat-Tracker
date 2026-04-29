@@ -123,8 +123,8 @@ export interface DerivedGameState {
 
 export type UiMode =
   | 'idle'               // default — no special interaction in progress
-  | 'block-pick'         // recorder tapped "Defensive Block", picking blocker
-  | 'intercept-pick'     // recorder tapped "Defensive Intercept", picking interceptor
+  | 'block-pick'         // recorder tapped "Blocked by Defence", picking blocker
+  | 'intercept-pick'     // recorder tapped "Intercepted by Defence", picking interceptor
   | 'receiver-error-pick' // recorder tapped "Receiver Error", picking player who had error
   | 'injury-pick'        // recorder tapped "Injury Sub", picking injured player
 

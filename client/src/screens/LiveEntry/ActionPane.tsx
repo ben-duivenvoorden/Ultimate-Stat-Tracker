@@ -80,9 +80,9 @@ export function ActionPane({
         <PickModePlaceholder uiMode={pickMode} onCancel={onCancelPickMode} />
       ) : isPullPhase ? (
         <div className="flex-1 p-1.5 flex flex-col gap-1.5">
-          <ActionTile label="Pull"       variant="primary" disabled={!pullerSelected} onClick={() => onRecordPull(false)} />
+          <ActionTile label="Pull"       variant="primary" disabled={!pullerSelected} onClick={() => onRecordPull(false)} compact />
           {recordingOptions.pullBonus && (
-            <ActionTile label="Pull Bonus" variant="warn" disabled={!pullerSelected} onClick={() => onRecordPull(true)} />
+            <ActionTile label="Pull Bonus" variant="warn" disabled={!pullerSelected} onClick={() => onRecordPull(true)} compact />
           )}
         </div>
       ) : (
@@ -91,8 +91,8 @@ export function ActionPane({
           <ActionTile label="Receiver Error"      variant="warn"    disabled={!armed}                       onClick={onReceiverError} />
           <Separator>TURNOVERS</Separator>
           <ActionTile label="Throw Away"          variant="danger"    disabled={!armed}                       onClick={onThrowAway} />
-          <ActionTile label="Defensive Block"     variant="block"     disabled={!armed} onClick={() => onDefensiveBlock('block')} />
-          <ActionTile label="Defensive Intercept" variant="intercept" disabled={!armed} onClick={() => onDefensiveBlock('intercept')} />
+          <ActionTile label="Blocked by Defence"    variant="block"     disabled={!armed} onClick={() => onDefensiveBlock('block')} />
+          <ActionTile label="Intercepted by Defence" variant="intercept" disabled={!armed} onClick={() => onDefensiveBlock('intercept')} />
           {recordingOptions.stall && (
             <ActionTile label="Stall"               variant="stall"     disabled={!armed}                       onClick={onStall} />
           )}
@@ -154,18 +154,21 @@ const tileColors: Record<TileVariant, { bg: string; color: string }> = {
 }
 
 function ActionTile({
-  label, variant, disabled, onClick,
+  label, variant, disabled, onClick, compact,
 }: {
   label: string
   variant: TileVariant
   disabled: boolean
   onClick: () => void
+  /** Fixed height instead of flex-1 — for phases with only a couple of tiles
+      (e.g. pull/pull-bonus) so they don't stretch to fill the column. */
+  compact?: boolean
 }) {
   const c = tileColors[variant]
   return (
     <button
       onClick={disabled ? undefined : onClick}
-      className="flex-1 flex items-center justify-center rounded-lg border text-sm font-semibold transition-opacity"
+      className={`${compact ? 'h-14 flex-shrink-0' : 'flex-1'} flex items-center justify-center rounded-lg border text-sm font-semibold transition-opacity`}
       style={{
         background:  disabled ? 'var(--color-surf-2)' : c.bg,
         borderColor: disabled ? 'var(--color-border)' : 'transparent',
