@@ -19,11 +19,11 @@ function avatarUrl(initials: string, color: string): string {
   }
 }
 
-const EMPIRE = team('A', 'Sacramento Empire', 'EMP', '#4a9eff')
+const EMPIRE = team('A', 'New York Empire', 'NYE', '#1f4788')
 const BREEZE = team('B', 'DC Breeze', 'DCB', '#ff6640')
 
 const EMPIRE_ROSTER: Player[] = [
-  player('a1', 'Matt Geyer', 'A', avatarUrl('MG', '#4a9eff')),
+  player('a1', 'Matt Geyer', 'A', avatarUrl('MG', '#1f4788')),
   player('a2', 'Kyle Weigand', 'A', avatarUrl('KW', '#4a9eff')),
   player('a3', 'Brodie Smith', 'A', avatarUrl('BS', '#4a9eff')),
   player('a4', 'Jimmy Mickle', 'A', avatarUrl('JM', '#4a9eff')),
