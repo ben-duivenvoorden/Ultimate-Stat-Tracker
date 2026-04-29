@@ -1,0 +1,150 @@
+import { useState } from 'react'
+import { Btn } from '@/components/ui/Btn'
+import { Chip } from '@/components/ui/Chip'
+import { Label } from '@/components/ui/Label'
+import { useGameStore } from '@/core/store'
+import { useSession } from '@/core/selectors'
+import { MOCK_GAMES } from '@/core/data'
+import type { TeamId } from '@/core/types'
+
+export default function GameSetup() {
+  const selectGame = useGameStore(s => s.selectGame)
+  const resumeGame = useGameStore(s => s.resumeGame)
+  const session    = useSession()
+
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [pullingTeam, setPullingTeam] = useState<TeamId | null>(null)
+
+  const game = selectedId ? MOCK_GAMES.find(g => g.id === selectedId) : null
+  const hasSession = !!(game && session && session.gameConfig.id === game.id && session.rawLog.length > 0)
+  const isFinished = !!(hasSession && session?.rawLog.some(e => e.type === 'end-game'))
+  const canResume = hasSession && !isFinished
+
+  return (
+    <div className="h-full flex bg-bg text-content">
+      {/* ── Game list ── */}
+      <div className="w-64 flex-shrink-0 flex flex-col border-r border-border">
+        <div className="px-4 py-3 border-b border-border flex-shrink-0">
+          <Label block className="mb-1">GAME SETUP</Label>
+          <div className="text-base font-bold">Select Game</div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {MOCK_GAMES.map(g => {
+            const isActive = selectedId === g.id
+            const isLive = g.status === 'in-progress'
+            return (
+              <button
+                key={g.id}
+                onClick={() => { setSelectedId(g.id); setPullingTeam(null) }}
+                className="w-full text-left px-4 py-3 border-b border-border transition-colors cursor-pointer"
+                style={{
+                  borderLeft: `3px solid ${isActive ? 'var(--color-team-a)' : 'transparent'}`,
+                  background: isActive ? 'var(--color-surf-2)' : 'transparent',
+                }}
+              >
+                <div className="text-sm font-semibold text-content mb-1.5">{g.name}</div>
+                <div className="flex items-center gap-2">
+                  <Chip color={isLive ? 'var(--color-success)' : 'var(--color-muted)'}>
+                    {isLive ? 'LIVE' : 'SCHED'}
+                  </Chip>
+                  <Label>{g.scheduledTime}</Label>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Detail pane ── */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-5 p-6">
+        {!game ? (
+          <div className="text-center">
+            <div className="text-4xl mb-3 opacity-30">🥏</div>
+            <Label>Select a game from the list</Label>
+          </div>
+        ) : (
+          <>
+            <div className="w-full max-w-sm bg-surf border border-border-2 rounded-xl p-5 text-center">
+              <Label block className="mb-2">{game.name}</Label>
+              {game.status === 'in-progress' && game.score ? (
+                <div className="flex items-center justify-center gap-6 my-3">
+                  <div>
+                    <div className="text-xs font-bold mb-1" style={{ color: game.teams.A.color }}>{game.teams.A.short}</div>
+                    <div className="text-5xl font-black text-content leading-none">{game.score.A}</div>
+                  </div>
+                  <div className="text-muted text-xl">—</div>
+                  <div>
+                    <div className="text-xs font-bold mb-1" style={{ color: game.teams.B.color }}>{game.teams.B.short}</div>
+                    <div className="text-5xl font-black text-content leading-none">{game.score.B}</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-3">
+                  <div className="text-base text-content mb-1">
+                    {game.teams.A.name} <span className="text-muted">vs</span> {game.teams.B.name}
+                  </div>
+                  <Label>Kick-off {game.scheduledTime}</Label>
+                </div>
+              )}
+            </div>
+
+            {/* Who pulls first — only when starting fresh */}
+            {!hasSession && (
+              <div className="w-full max-w-sm">
+                <Label block className="text-center mb-3">WHO PULLS FIRST?</Label>
+                <div className="flex gap-3">
+                  {(['A', 'B'] as TeamId[]).map(t => {
+                    const team = game.teams[t]
+                    const selected = pullingTeam === t
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => setPullingTeam(t)}
+                        className="flex-1 h-11 rounded-lg border text-sm font-semibold transition-all cursor-pointer"
+                        style={{
+                          background: selected ? `${team.color}22` : 'transparent',
+                          borderColor: selected ? `${team.color}88` : 'var(--color-border)',
+                          color: selected ? team.color : 'var(--color-muted)',
+                        }}
+                      >
+                        {team.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex gap-3">
+              {isFinished ? (
+                <>
+                  <Btn variant="primary" size="lg" onClick={() => resumeGame(game.id)}>
+                    View Final Stats
+                  </Btn>
+                  <Btn variant="ghost" size="lg">Export</Btn>
+                </>
+              ) : canResume ? (
+                <>
+                  <Btn variant="primary" size="lg" onClick={() => resumeGame(game.id)}>
+                    ▶  Continue Recording
+                  </Btn>
+                  <Btn variant="ghost" size="lg">Export</Btn>
+                </>
+              ) : (
+                <Btn
+                  variant="primary"
+                  size="lg"
+                  disabled={!pullingTeam}
+                  onClick={() => pullingTeam && selectGame(game.id, pullingTeam)}
+                >
+                  Start Recording
+                </Btn>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}

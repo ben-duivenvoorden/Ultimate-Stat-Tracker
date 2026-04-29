@@ -1,0 +1,60 @@
+@import '@fontsource/roboto/400.css';
+@import '@fontsource/roboto/500.css';
+@import '@fontsource/roboto/700.css';
+@import '@fontsource/roboto/900.css';
+@import '@fontsource/roboto-mono/400.css';
+@import '@fontsource/roboto-mono/500.css';
+@import "tailwindcss";
+
+@theme {
+  /* Surface hierarchy */
+  --color-bg:       #111111;
+  --color-surf:     #181818;
+  --color-surf-2:   #202020;
+  --color-surf-3:   #282828;
+
+  /* Borders */
+  --color-border:   #2c2c2c;
+  --color-border-2: #383838;
+
+  /* Text */
+  --color-content:  #e8e8e8;
+  --color-muted:    #666666;
+  --color-dim:      #444444;
+
+  /* Teams */
+  --color-team-a:   #4a9eff;
+  --color-team-b:   #ff6640;
+
+  /* Semantic */
+  --color-success:  #3dba78;
+  --color-warn:     #f5a623;
+  --color-danger:   #ff4d4d;
+  --color-block:    #9c6ef8;
+  --color-block-bg: #150f24;
+  --color-injury-bg:#1c1200;
+
+  /* Typography */
+  --font-sans: 'Roboto', sans-serif;
+  --font-mono: 'Roboto Mono', monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent text selection on rapid taps */
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
