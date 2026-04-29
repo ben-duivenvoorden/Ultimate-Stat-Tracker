@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useGameStore } from './store'
 import { computeVisLog, deriveGameState } from './engine'
-import type { DerivedGameState, VisLogEntry, GameSession } from './types'
+import type { DerivedGameState, VisLogEntry, GameSession, RecordingOptions } from './types'
+import { DEFAULT_RECORDING_OPTIONS } from './types'
 
 // Single subscription to the session — re-derives only when session reference changes.
 // (Session reference changes only when an action mutates the rawLog or activeLine.)
@@ -36,6 +37,8 @@ export function useGameActions() {
     recordReceiverError: s.recordReceiverError,
     recordGoal:          s.recordGoal,
     triggerDefBlock:     s.triggerDefBlock,
+    recordFoul:          s.recordFoul,
+    recordPick:          s.recordPick,
     undo:                s.undo,
     triggerHalfTime:     s.triggerHalfTime,
     triggerEndGame:      s.triggerEndGame,
@@ -43,6 +46,10 @@ export function useGameActions() {
     cancelPickMode:      s.cancelPickMode,
     setShowEventMenu:    s.setShowEventMenu,
   })))
+}
+
+export function useRecordingOptions(): RecordingOptions {
+  return useGameStore(s => s.recordingOptions) ?? DEFAULT_RECORDING_OPTIONS
 }
 
 export function useUiState() {

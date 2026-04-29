@@ -40,7 +40,7 @@ export default function LineSelection() {
             {isInjurySub ? 'INJURY SUBSTITUTION — MID-POINT' : 'LINE SELECTION'}
           </Label>
           <div className="text-sm font-bold">
-            {isInjurySub ? 'Swap one player, then confirm' : 'Pick up to 7 active players per team'}
+            {isInjurySub ? 'Swap one player, then confirm' : 'Pick up to 7 _New Changes players per team'}
           </div>
         </div>
         <div className="flex items-center gap-2">

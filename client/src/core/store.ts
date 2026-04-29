@@ -8,8 +8,9 @@ import type {
   Player,
   GameSession,
   RawEvent,
+  RecordingOptions,
 } from './types'
-import { otherTeam } from './types'
+import { otherTeam, DEFAULT_RECORDING_OPTIONS } from './types'
 import {
   deriveGameState,
   canRecord,
@@ -29,6 +30,7 @@ interface GameStore {
   isInjurySub: boolean
   uiMode: UiMode
   selPuller: PlayerId | null
+  recordingOptions: RecordingOptions
 
   // Transient (not persisted)
   showEventMenu: boolean
@@ -41,17 +43,24 @@ interface GameStore {
   backToGameList:    () => void
 
   // Recording actions (all funnel through canRecord guards)
-  tapPlayer:         (player: Player) => void
-  recordPull:        (bonus?: boolean) => void
-  recordThrowAway:   () => void
+  tapPlayer:           (player: Player) => void
+  recordPull:          (bonus?: boolean) => void
+  recordThrowAway:     () => void
   recordReceiverError: () => void
-  recordGoal:        () => void
-  triggerDefBlock:   (type: 'block' | 'intercept') => void
-  undo:              () => void
-  triggerHalfTime:   () => void
-  triggerEndGame:    () => void
-  triggerInjurySub:  () => void
-  cancelPickMode:    () => void
+  recordGoal:          () => void
+  triggerDefBlock:     (type: 'block' | 'intercept') => void
+  recordFoul:          () => void
+  recordPick:          () => void
+  undo:                () => void
+  triggerHalfTime:     () => void
+  triggerEndGame:      () => void
+  triggerInjurySub:    () => void
+  cancelPickMode:      () => void
+
+  // Settings
+  openGameSettings:      () => void
+  closeGameSettings:     () => void
+  updateRecordingOption: <K extends keyof RecordingOptions>(key: K, value: RecordingOptions[K]) => void
 
   // Pure UI
   setShowEventMenu:  (show: boolean) => void
@@ -59,7 +68,7 @@ interface GameStore {
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
-const STORAGE_VERSION = 1
+const STORAGE_VERSION = 2
 const STORAGE_KEY     = 'ust-game'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -85,12 +94,13 @@ export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
       // Initial state
-      session:       null,
-      screen:        'game-setup',
-      isInjurySub:   false,
-      uiMode:        'idle',
-      selPuller:     null,
-      showEventMenu: false,
+      session:          null,
+      screen:           'game-setup',
+      isInjurySub:      false,
+      uiMode:           'idle',
+      selPuller:        null,
+      showEventMenu:    false,
+      recordingOptions: DEFAULT_RECORDING_OPTIONS,
 
       // ── selectGame ──────────────────────────────────────────────────────────
       // Start a fresh game session (overwrites any existing one).
@@ -193,6 +203,9 @@ export const useGameStore = create<GameStore>()(
 
         // Pass chain: tap = possession transfer
         if (state.gamePhase === 'in-play' && canRecord(state, 'possession')) {
+          // Don't record if they already have possession
+          if (state.discHolder === player.id) return
+
           set({
             session: appendEvents(session, [{
               ...baseRawEvent(state.pointIndex),
@@ -364,6 +377,42 @@ export const useGameStore = create<GameStore>()(
         })
       },
 
+      // ── recordFoul / recordPick ──────────────────────────────────────────────
+      recordFoul() {
+        const { session } = get()
+        if (!session) return
+        const state = deriveGameState(session)
+        if (!canRecord(state, 'foul')) return
+        set({
+          session: appendEvents(session, [{ ...baseRawEvent(state.pointIndex), type: 'foul' }]),
+          showEventMenu: false,
+        })
+      },
+
+      recordPick() {
+        const { session } = get()
+        if (!session) return
+        const state = deriveGameState(session)
+        if (!canRecord(state, 'pick')) return
+        set({
+          session: appendEvents(session, [{ ...baseRawEvent(state.pointIndex), type: 'pick' }]),
+          showEventMenu: false,
+        })
+      },
+
+      // ── Settings navigation ──────────────────────────────────────────────────
+      openGameSettings() {
+        set({ screen: 'game-settings', showEventMenu: false })
+      },
+
+      closeGameSettings() {
+        set({ screen: 'game-setup' })
+      },
+
+      updateRecordingOption(key, value) {
+        set(s => ({ recordingOptions: { ...s.recordingOptions, [key]: value } }))
+      },
+
       // ── setShowEventMenu ─────────────────────────────────────────────────────
       setShowEventMenu(show) {
         set({ showEventMenu: show })
@@ -373,12 +422,19 @@ export const useGameStore = create<GameStore>()(
       name:    STORAGE_KEY,
       version: STORAGE_VERSION,
       storage: createJSONStorage(() => localStorage),
+      migrate: (persisted, fromVersion) => {
+        if (fromVersion < 2) {
+          return { ...(persisted as object), recordingOptions: DEFAULT_RECORDING_OPTIONS }
+        }
+        return persisted
+      },
       partialize: (state) => ({
-        session:     state.session,
-        screen:      state.screen,
-        isInjurySub: state.isInjurySub,
-        uiMode:      state.uiMode,
-        selPuller:   state.selPuller,
+        session:          state.session,
+        screen:           state.screen,
+        isInjurySub:      state.isInjurySub,
+        uiMode:           state.uiMode,
+        selPuller:        state.selPuller,
+        recordingOptions: state.recordingOptions,
       }),
     },
   ),

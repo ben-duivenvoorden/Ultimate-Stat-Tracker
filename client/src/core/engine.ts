@@ -144,6 +144,11 @@ export function deriveGameState(session: GameSession): DerivedGameState {
         state.gamePhase = 'game-over'
         break
 
+      case 'foul':
+      case 'pick':
+        // Stoppages — logged but no state change
+        break
+
       case 'system':
         // Metadata only — no state change
         break
@@ -186,6 +191,10 @@ export function canRecord(state: DerivedGameState, eventType: RawEventType): boo
 
     case 'half-time':
     case 'end-game':
+      return state.gamePhase === 'in-play' || state.gamePhase === 'awaiting-pull'
+
+    case 'foul':
+    case 'pick':
       return state.gamePhase === 'in-play' || state.gamePhase === 'awaiting-pull'
 
     case 'system':

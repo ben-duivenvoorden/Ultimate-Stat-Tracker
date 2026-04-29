@@ -45,6 +45,8 @@ export type RawEventType =
   | 'injury-sub'
   | 'half-time'
   | 'end-game'
+  | 'foul'
+  | 'pick'
   | 'system'
   | 'undo'
   | 'amend'
@@ -64,6 +66,8 @@ export interface GoalRawEvent       extends BaseRawEvent { type: 'goal';        
 export interface InjurySubRawEvent  extends BaseRawEvent { type: 'injury-sub';          outPlayerId: PlayerId; inPlayerId: PlayerId; teamId: TeamId }
 export interface HalfTimeRawEvent   extends BaseRawEvent { type: 'half-time' }
 export interface EndGameRawEvent    extends BaseRawEvent { type: 'end-game' }
+export interface FoulRawEvent       extends BaseRawEvent { type: 'foul' }
+export interface PickRawEvent       extends BaseRawEvent { type: 'pick' }
 export interface SystemRawEvent     extends BaseRawEvent { type: 'system'; text: string }
 export interface UndoRawEvent       extends BaseRawEvent { type: 'undo' }
 export interface AmendRawEvent      extends BaseRawEvent { type: 'amend'; targetEventId: EventId; replacement: RawEvent | null }
@@ -78,6 +82,8 @@ export type RawEvent =
   | InjurySubRawEvent
   | HalfTimeRawEvent
   | EndGameRawEvent
+  | FoulRawEvent
+  | PickRawEvent
   | SystemRawEvent
   | UndoRawEvent
   | AmendRawEvent
@@ -115,7 +121,21 @@ export type UiMode =
   | 'intercept-pick'     // recorder tapped "Defensive Intercept", picking interceptor
   | 'injury-pick'        // recorder tapped "Injury Sub", picking injured player
 
-export type AppScreen = 'game-setup' | 'line-selection' | 'live-entry'
+export type AppScreen = 'game-setup' | 'game-settings' | 'line-selection' | 'live-entry'
+
+// ─── Recording options ────────────────────────────────────────────────────────
+
+export interface RecordingOptions {
+  pullBonus: boolean
+  foul:      boolean
+  pick:      boolean
+}
+
+export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
+  pullBonus: true,
+  foul:      false,
+  pick:      false,
+}
 
 // ─── Game config & session ────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 import { Label } from '@/components/ui/Label'
 import { Btn } from '@/components/ui/Btn'
-import type { GamePhase, UiMode } from '@/core/types'
+import type { GamePhase, UiMode, RecordingOptions } from '@/core/types'
 import { TerminalPanel, type TerminalPanelProps } from './TerminalPanel'
 
 interface ActionPaneProps {
@@ -10,6 +10,7 @@ interface ActionPaneProps {
   discHolderName: string | null
   selPullerName: string | null
   defendingShort: string
+  recordingOptions: RecordingOptions
 
   onRecordPull:        (bonus?: boolean) => void
   onThrowAway:         () => void
@@ -19,6 +20,9 @@ interface ActionPaneProps {
   onHalfTime:          () => void
   onEndGame:           () => void
   onInjurySub:         () => void
+  onFoul:              () => void
+  onPick:              () => void
+  onBackToGames:       () => void
   showEventMenu:       boolean
   setShowEventMenu:    (v: boolean) => void
 
@@ -27,8 +31,9 @@ interface ActionPaneProps {
 
 export function ActionPane({
   gamePhase, uiMode, pullerSelected, discHolderName, selPullerName, defendingShort,
+  recordingOptions,
   onRecordPull, onThrowAway, onReceiverError, onDefensiveBlock, onGoal,
-  onHalfTime, onEndGame, onInjurySub,
+  onHalfTime, onEndGame, onInjurySub, onFoul, onPick, onBackToGames,
   showEventMenu, setShowEventMenu,
   terminalProps,
 }: ActionPaneProps) {
@@ -58,18 +63,14 @@ export function ActionPane({
       className="flex-1 flex flex-col"
       style={{ borderLeft: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)' }}
     >
-      <div
-        className="flex-shrink-0 h-7 flex items-center px-2.5 gap-1.5"
-        style={{ borderBottom: '1px solid var(--color-border)' }}
-      >
-        {isPickMode && (
-          <span
-            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-            style={{ background: contextColor, boxShadow: `0 0 4px ${contextColor}` }}
-          />
-        )}
-        <Label className="text-[9px] truncate" color={contextColor}>{contextLabel}</Label>
-      </div>
+      {!isPickMode && (
+        <div
+          className="flex-shrink-0 h-7 flex items-center px-2.5 gap-1.5"
+          style={{ borderBottom: '1px solid var(--color-border)' }}
+        >
+          <Label className="text-[9px] truncate" color={contextColor}>{contextLabel}</Label>
+        </div>
+      )}
 
       {isTerminal ? (
         <TerminalPanel {...terminalProps} />
@@ -78,7 +79,9 @@ export function ActionPane({
       ) : isPullPhase ? (
         <div className="flex-1 p-1.5 flex flex-col gap-1.5">
           <ActionTile label="Pull"       variant="primary" disabled={!pullerSelected} onClick={() => onRecordPull(false)} />
-          <ActionTile label="Pull Bonus" variant="warn"    disabled={!pullerSelected} onClick={() => onRecordPull(true)}  />
+          {recordingOptions.pullBonus && (
+            <ActionTile label="Pull Bonus" variant="warn" disabled={!pullerSelected} onClick={() => onRecordPull(true)} />
+          )}
         </div>
       ) : (
         <div className="flex-1 p-1.5 flex flex-col gap-0.5 overflow-hidden">
@@ -86,8 +89,8 @@ export function ActionPane({
           <ActionTile label="Receiver Error"      variant="danger"  disabled={!armed}                       onClick={onReceiverError} />
           <Separator>TURNOVER</Separator>
           <ActionTile label="Throw Away"          variant="warn"    disabled={!armed}                       onClick={onThrowAway} />
-          <ActionTile label="Defensive Block"     variant="block"   disabled={gamePhase !== 'in-play'}     onClick={() => onDefensiveBlock('block')} />
-          <ActionTile label="Defensive Intercept" variant="block"   disabled={gamePhase !== 'in-play'}     onClick={() => onDefensiveBlock('intercept')} />
+          <ActionTile label="Defensive Block"     variant="block"     disabled={!armed} onClick={() => onDefensiveBlock('block')} />
+          <ActionTile label="Defensive Intercept" variant="intercept" disabled={!armed} onClick={() => onDefensiveBlock('intercept')} />
           <Separator>COMPLETE</Separator>
           <ActionTile label="Goal"                variant="success" disabled={!armed}                       onClick={onGoal} />
         </div>
@@ -115,8 +118,15 @@ export function ActionPane({
           >
             <Label block className="mb-1 px-1">STOPPAGES</Label>
             <Btn variant="warn"  size="md" full onClick={onInjurySub}>Injury Sub</Btn>
+            {recordingOptions.foul && (
+              <Btn variant="ghost" size="md" full onClick={onFoul}>Foul</Btn>
+            )}
+            {recordingOptions.pick && (
+              <Btn variant="ghost" size="md" full onClick={onPick}>Pick</Btn>
+            )}
             <Btn variant="ghost" size="md" full onClick={onHalfTime}>Half Time</Btn>
             <Btn variant="ghost" size="md" full onClick={onEndGame}>End Game</Btn>
+            <Btn variant="ghost" size="md" full onClick={onBackToGames}>← Back to Games</Btn>
           </div>
         </>
       )}
@@ -126,14 +136,15 @@ export function ActionPane({
 
 // ── Building blocks ────────────────────────────────────────────────────────────
 
-type TileVariant = 'primary' | 'danger' | 'warn' | 'block' | 'success'
+type TileVariant = 'primary' | 'danger' | 'warn' | 'block' | 'intercept' | 'success'
 
 const tileColors: Record<TileVariant, { bg: string; color: string }> = {
-  primary: { bg: 'var(--color-team-a)',  color: '#fff'             },
-  danger:  { bg: 'var(--color-danger)',  color: '#fff'             },
-  warn:    { bg: 'var(--color-warn)',    color: 'var(--color-bg)'  },
-  block:   { bg: 'var(--color-block)',   color: '#fff'             },
-  success: { bg: 'var(--color-success)', color: '#fff'             },
+  primary:   { bg: 'var(--color-team-a)',    color: '#fff'            },
+  danger:    { bg: 'var(--color-danger)',    color: '#fff'            },
+  warn:      { bg: 'var(--color-warn)',      color: 'var(--color-bg)' },
+  block:     { bg: 'var(--color-block)',     color: '#fff'            },
+  intercept: { bg: 'var(--color-intercept)', color: 'var(--color-bg)' },
+  success:   { bg: 'var(--color-success)',   color: '#fff'            },
 }
 
 function ActionTile({
@@ -180,7 +191,9 @@ function Separator({ children }: { children: string }) {
 function PickModePlaceholder({ uiMode }: { uiMode: UiMode }) {
   const isInjury    = uiMode === 'injury-pick'
   const isIntercept = uiMode === 'intercept-pick'
-  const color = isInjury ? 'var(--color-warn)' : 'var(--color-block)'
+  const color = isInjury    ? 'var(--color-warn)'
+              : isIntercept ? 'var(--color-intercept)'
+              :               'var(--color-block)'
   const label = isInjury    ? 'Injury Sub'
               : isIntercept ? 'Defensive Intercept'
               :               'Defensive Block'

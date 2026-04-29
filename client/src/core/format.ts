@@ -23,6 +23,8 @@ export function formatVisLogEntry(entry: VisLogEntry, players: Player[]): string
     case 'injury-sub':               return `Injury Sub — ${name(entry.outPlayerId)} → ${name(entry.inPlayerId)}`
     case 'half-time':                return '— Half Time —'
     case 'end-game':                 return '— Game Over —'
+    case 'foul':                     return 'Foul'
+    case 'pick':                     return 'Pick'
     case 'system':                   return entry.text
   }
 }
@@ -43,6 +45,8 @@ export function getVisLogColor(type: VisLogEntry['type']): string {
     case 'goal':
       return 'var(--color-success)'
     case 'injury-sub':
+    case 'foul':
+    case 'pick':
       return 'var(--color-warn)'
     case 'point-start':
     case 'half-time':

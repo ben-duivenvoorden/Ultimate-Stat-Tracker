@@ -1,4 +1,4 @@
-import { useSession, useDerivedState, useVisLog, useGameActions, useUiState } from '@/core/selectors'
+import { useSession, useDerivedState, useVisLog, useGameActions, useUiState, useRecordingOptions } from '@/core/selectors'
 import { otherTeam, type TeamId } from '@/core/types'
 import { Label } from '@/components/ui/Label'
 import { PlayerPane, type PlayerPaneMode } from './PlayerPane'
@@ -7,11 +7,12 @@ import { LogPane } from './LogPane'
 import type { TerminalPanelProps } from './TerminalPanel'
 
 export default function LiveEntry() {
-  const session = useSession()
-  const state   = useDerivedState()
-  const visLog  = useVisLog()
-  const ui      = useUiState()
-  const actions = useGameActions()
+  const session         = useSession()
+  const state           = useDerivedState()
+  const visLog          = useVisLog()
+  const ui              = useUiState()
+  const actions         = useGameActions()
+  const recordingOptions = useRecordingOptions()
 
   if (!session || !state) return null
 
@@ -22,30 +23,23 @@ export default function LiveEntry() {
   const isPullPhase = state.gamePhase === 'awaiting-pull'
   const isTerminal  = state.gamePhase === 'point-over' || state.gamePhase === 'half-time' || state.gamePhase === 'game-over'
 
-  // ── Which team's players to show in the player pane ──
-  let displayTeam: TeamId
-  if (isPullPhase) {
-    displayTeam = otherTeam(state.possession)            // pulling team
-  } else if (ui.uiMode === 'block-pick' || ui.uiMode === 'intercept-pick') {
-    displayTeam = otherTeam(state.possession)            // defending team
+  // Which team's players are "active" (shown, interactable)
+  let activeTeam: TeamId
+  if (isPullPhase || ui.uiMode === 'block-pick' || ui.uiMode === 'intercept-pick') {
+    activeTeam = otherTeam(state.possession)
   } else {
-    displayTeam = state.possession
+    activeTeam = state.possession
   }
-  const displayPlayers = session.activeLine[displayTeam]
-  const displayTeamData = teams[displayTeam]
-
-  // Player pane sits on the LEFT when its team attacks left → right
-  const playersOnLeft = displayTeam === state.attackLeft
 
   const playerMode: PlayerPaneMode =
-    ui.uiMode === 'injury-pick' ? 'injury' :
-    ui.uiMode === 'block-pick' || ui.uiMode === 'intercept-pick' ? 'block' :
-    isPullPhase ? 'pull' :
+    ui.uiMode === 'injury-pick'     ? 'injury' :
+    ui.uiMode === 'intercept-pick'  ? 'intercept' :
+    ui.uiMode === 'block-pick'      ? 'block' :
+    isPullPhase                     ? 'pull' :
     'normal'
 
-  // ── Names for context strings (engine deals in IDs; UI surfaces names) ──
-  const allPlayers = [...session.gameConfig.rosters.A, ...session.gameConfig.rosters.B]
-  const lookupName = (id: string | null) => id ? (allPlayers.find(p => p.id === id)?.name ?? id) : null
+  const allPlayers     = [...session.gameConfig.rosters.A, ...session.gameConfig.rosters.B]
+  const lookupName     = (id: string | null) => id ? (allPlayers.find(p => p.id === id)?.name ?? id) : null
   const discHolderName = lookupName(state.discHolder)
   const selPullerName  = lookupName(ui.selPuller)
   const goalScorerName = isTerminal
@@ -65,12 +59,30 @@ export default function LiveEntry() {
     onBackToGames:        actions.backToGameList,
   }
 
-  // ── Field direction cue ──
   const attackingTeam = teams[state.attackLeft]
   const defendingTeam = teams[otherTeam(state.attackLeft)]
 
+  // Action pane is the sliding overlay — it always covers the inactive team.
+  // Layout columns: [Team A | Team B | Log]
+  //   Team A active → action covers Team B (centre) → translateX(100%)
+  //   Team B active → action covers Team A (left)   → translateX(0%)
+  const actionTranslateX = activeTeam === 'A' ? '100%' : '0%'
+
+  const sharedPlayerPaneProps = {
+    scoreA:       state.score.A,
+    scoreB:       state.score.B,
+    teamAColor:   teams.A.color,
+    teamBColor:   teams.B.color,
+    teamAShort:   teams.A.short,
+    teamBShort:   teams.B.short,
+    discHolderId: state.discHolder,
+    selPullerId:  ui.selPuller,
+    onTap:        actions.tapPlayer,
+  }
+
   return (
     <div className="h-full flex flex-col bg-bg">
+      {/* Field direction cue */}
       <div
         className="flex-shrink-0 flex items-center justify-between px-4 h-6 text-[9px] font-mono tracking-widest"
         style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-dim)' }}
@@ -80,59 +92,37 @@ export default function LiveEntry() {
         <span style={{ color: defendingTeam.color }}>→ {defendingTeam.short}</span>
       </div>
 
-      {/* Three-pane layout — pane order swaps with possession direction */}
       <div className="flex-1 flex overflow-hidden relative">
-        {!isTerminal && (
-          <div style={{ order: playersOnLeft ? 1 : 3, flex: 1, display: 'flex' }}>
+
+        {/* Pane 1: Team A — always left */}
+        <div style={{ flex: 1, display: 'flex' }}>
+          {!isTerminal && (
             <PlayerPane
-              players={displayPlayers}
-              teamColor={displayTeamData.color}
-              teamShort={displayTeamData.short}
-              scoreA={state.score.A}
-              scoreB={state.score.B}
-              teamAColor={teams.A.color}
-              teamBColor={teams.B.color}
-              teamAShort={teams.A.short}
-              teamBShort={teams.B.short}
-              mode={playerMode}
-              discHolderId={state.discHolder}
-              selPullerId={ui.selPuller}
-              onTap={(p) => isPickMode ? actions.tapPlayer(p) : actions.tapPlayer(p)}
+              {...sharedPlayerPaneProps}
+              players={session.activeLine.A}
+              teamColor={teams.A.color}
+              teamShort={teams.A.short}
+              mode={activeTeam === 'A' ? playerMode : 'normal'}
             />
-          </div>
-        )}
-
-        {/* Pick-mode dismiss area (covers entire layout when active) */}
-        {isPickMode && (
-          <div
-            className="absolute inset-0 z-0"
-            onClick={actions.cancelPickMode}
-          />
-        )}
-
-        <div style={{ order: 2, flex: 1, display: 'flex', position: 'relative', zIndex: 1 }}>
-          <ActionPane
-            gamePhase={state.gamePhase}
-            uiMode={ui.uiMode}
-            pullerSelected={ui.selPuller !== null}
-            discHolderName={discHolderName}
-            selPullerName={selPullerName}
-            defendingShort={teams[otherTeam(state.possession)].short}
-            onRecordPull={actions.recordPull}
-            onThrowAway={actions.recordThrowAway}
-            onReceiverError={actions.recordReceiverError}
-            onDefensiveBlock={actions.triggerDefBlock}
-            onGoal={actions.recordGoal}
-            onHalfTime={actions.triggerHalfTime}
-            onEndGame={actions.triggerEndGame}
-            onInjurySub={actions.triggerInjurySub}
-            showEventMenu={ui.showEventMenu}
-            setShowEventMenu={actions.setShowEventMenu}
-            terminalProps={terminalProps}
-          />
+          )}
         </div>
 
-        <div style={{ order: playersOnLeft ? 3 : 1, flex: 1, display: 'flex', position: 'relative', zIndex: 1 }}>
+        {/* Pane 2: Team B — always centre, right-aligned */}
+        <div style={{ flex: 1, display: 'flex' }}>
+          {!isTerminal && (
+            <PlayerPane
+              {...sharedPlayerPaneProps}
+              players={session.activeLine.B}
+              teamColor={teams.B.color}
+              teamShort={teams.B.short}
+              mode={activeTeam === 'B' ? playerMode : 'normal'}
+              align="right"
+            />
+          )}
+        </div>
+
+        {/* Pane 3: Event log — always right, never moves */}
+        <div style={{ flex: 1, display: 'flex' }}>
           <LogPane
             visLog={visLog}
             players={allPlayers}
@@ -141,9 +131,52 @@ export default function LiveEntry() {
             onExport={() => alert('Export coming soon')}
           />
         </div>
-      </div>
 
-      {/* Dev state strip — easy to remove */}
+        {/* Pane 4: Action pane — slides over inactive team's column.
+            In pick mode it shows PickModePlaceholder (no buttons),
+            so tapping it cancels pick mode naturally. */}
+        <div
+          style={{
+            position:   'absolute',
+            top: 0, bottom: 0, left: 0,
+            width:      'calc(100% / 3)',
+            transform:  `translateX(${actionTranslateX})`,
+            transition: 'transform 220ms ease-in-out',
+            zIndex:     10,
+            display:    'flex',
+            background: 'var(--color-bg)',
+          }}
+          onClick={isPickMode ? actions.cancelPickMode : undefined}
+        >
+          <ActionPane
+            gamePhase={state.gamePhase}
+            uiMode={ui.uiMode}
+            pullerSelected={ui.selPuller !== null}
+            discHolderName={discHolderName}
+            selPullerName={selPullerName}
+            defendingShort={teams[otherTeam(state.possession)].short}
+            recordingOptions={recordingOptions}
+            onRecordPull={actions.recordPull}
+            onThrowAway={actions.recordThrowAway}
+            onReceiverError={actions.recordReceiverError}
+            onDefensiveBlock={actions.triggerDefBlock}
+            onGoal={actions.recordGoal}
+            onHalfTime={actions.triggerHalfTime}
+            onEndGame={actions.triggerEndGame}
+            onInjurySub={actions.triggerInjurySub}
+            onFoul={actions.recordFoul}
+            onPick={actions.recordPick}
+            onBackToGames={actions.backToGameList}
+            showEventMenu={ui.showEventMenu}
+            setShowEventMenu={actions.setShowEventMenu}
+            terminalProps={terminalProps}
+          />
+        </div>
+
+
+</div>
+
+      {/* Dev state strip */}
       <div
         className="flex-shrink-0 flex items-center px-4 h-5 text-[9px] font-mono"
         style={{ borderTop: '1px solid var(--color-border)', color: 'var(--color-dim)' }}

@@ -1,7 +1,7 @@
 import type { Player } from '@/core/types'
 import { Label } from '@/components/ui/Label'
 
-export type PlayerPaneMode = 'normal' | 'pull' | 'block' | 'injury'
+export type PlayerPaneMode = 'normal' | 'pull' | 'block' | 'intercept' | 'injury'
 
 interface PlayerPaneProps {
   players: Player[]
@@ -17,24 +17,27 @@ interface PlayerPaneProps {
   mode: PlayerPaneMode
   discHolderId: string | null
   selPullerId: string | null
+  align?: 'right'
 
   onTap: (player: Player) => void
 }
 
 const modeMeta = {
-  normal: { bg: 'var(--color-bg)',         label: 'POSSESSION',   accent: null },
-  pull:   { bg: 'var(--color-bg)',         label: 'PULLING',      accent: null },
-  block:  { bg: 'var(--color-block-bg)',   label: 'PICK BLOCKER', accent: 'var(--color-block)' },
-  injury: { bg: 'var(--color-injury-bg)', label: 'PICK INJURED', accent: 'var(--color-warn)' },
+  normal:    { bg: 'var(--color-bg)',           label: 'POSSESSION',       accent: null },
+  pull:      { bg: 'var(--color-bg)',           label: 'PULLING',          accent: null },
+  block:     { bg: 'var(--color-block-bg)',     label: 'PICK BLOCKER',     accent: 'var(--color-block)' },
+  intercept: { bg: 'var(--color-intercept-bg)', label: 'PICK INTERCEPTOR', accent: 'var(--color-intercept)' },
+  injury:    { bg: 'var(--color-injury-bg)',   label: 'PICK INJURED',     accent: 'var(--color-warn)' },
 } as const
 
 export function PlayerPane({
   players, teamColor, teamShort,
   scoreA, scoreB, teamAShort, teamBShort, teamAColor, teamBColor,
-  mode, discHolderId, selPullerId,
+  mode, discHolderId, selPullerId, align,
   onTap,
 }: PlayerPaneProps) {
   const { bg, label, accent } = modeMeta[mode]
+  const isRight = align === 'right'
 
   return (
     <div
@@ -43,9 +46,12 @@ export function PlayerPane({
     >
       <div
         className="flex-shrink-0 h-7 flex items-center justify-between px-2"
-        style={{ borderBottom: `1px solid ${accent ? `${accent}33` : 'var(--color-border)'}` }}
+        style={{
+          borderBottom: `1px solid ${accent ? `${accent}33` : 'var(--color-border)'}`,
+          flexDirection: isRight ? 'row-reverse' : 'row',
+        }}
       >
-        <div>
+        <div style={{ textAlign: isRight ? 'right' : 'left' }}>
           <Label
             className="text-[9px] block leading-none mb-px"
             color={accent ?? 'var(--color-muted)'}
@@ -57,7 +63,10 @@ export function PlayerPane({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 text-[10px]">
+        <div
+          className="flex items-center gap-1 text-[10px]"
+          style={{ flexDirection: isRight ? 'row-reverse' : 'row' }}
+        >
           <span className="font-bold" style={{ color: teamAColor }}>{teamAShort}</span>
           <strong className="text-[15px] font-black text-content">{scoreA}</strong>
           <span className="text-dim text-[9px]">–</span>
@@ -71,26 +80,37 @@ export function PlayerPane({
         style={{ gridTemplateRows: `repeat(${players.length}, 1fr)` }}
       >
         {players.map(p => {
-          const isHighlit = p.id === discHolderId || p.id === selPullerId
-          const isPickMode = mode === 'block' || mode === 'injury'
+          const isHighlit  = p.id === discHolderId || p.id === selPullerId
+          const isPickMode = mode === 'block' || mode === 'intercept' || mode === 'injury'
           const activeColor = isPickMode ? accent! : teamColor
 
           return (
             <button
               key={p.id}
               onClick={() => onTap(p)}
-              className="flex items-center gap-2 px-3 rounded-md border transition-all cursor-pointer text-left"
+              className="flex items-center gap-2 px-2 rounded-md border transition-all cursor-pointer"
               style={{
+                flexDirection: isRight ? 'row-reverse' : 'row',
+                textAlign:     isRight ? 'right' : 'left',
                 background:   isPickMode ? `${activeColor}1a` : isHighlit ? `${teamColor}28` : 'var(--color-surf-2)',
                 borderColor:  isPickMode ? `${activeColor}66` : isHighlit ? teamColor : 'var(--color-border)',
                 color:        'var(--color-content)',
                 fontWeight:   isHighlit ? 700 : 400,
               }}
             >
-              <span
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors"
-                style={{ background: isPickMode ? activeColor : isHighlit ? teamColor : 'var(--color-border)' }}
-              />
+              {p.photoUrl ? (
+                <img
+                  src={p.photoUrl}
+                  alt={p.name}
+                  className="w-6 h-6 rounded-full flex-shrink-0 object-cover"
+                  style={{ border: `1.5px solid ${isPickMode ? activeColor : isHighlit ? teamColor : 'var(--color-border-2)'}` }}
+                />
+              ) : (
+                <span
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors"
+                  style={{ background: isPickMode ? activeColor : isHighlit ? teamColor : 'var(--color-border)' }}
+                />
+              )}
               <span className="text-sm leading-none">{p.name}</span>
             </button>
           )

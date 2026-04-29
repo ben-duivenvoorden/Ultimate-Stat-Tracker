@@ -30,9 +30,11 @@
   --color-success:  #3dba78;
   --color-warn:     #f5a623;
   --color-danger:   #ff4d4d;
-  --color-block:    #9c6ef8;
-  --color-block-bg: #150f24;
-  --color-injury-bg:#1c1200;
+  --color-block:         #9c6ef8;
+  --color-block-bg:      #150f24;
+  --color-intercept:     #22d3ee;
+  --color-intercept-bg:  #061a1f;
+  --color-injury-bg:     #1c1200;
 
   /* Typography */
   --font-sans: 'Roboto', sans-serif;

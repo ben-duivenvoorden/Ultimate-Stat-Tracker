@@ -8,9 +8,10 @@ import { MOCK_GAMES } from '@/core/data'
 import type { TeamId } from '@/core/types'
 
 export default function GameSetup() {
-  const selectGame = useGameStore(s => s.selectGame)
-  const resumeGame = useGameStore(s => s.resumeGame)
-  const session    = useSession()
+  const selectGame       = useGameStore(s => s.selectGame)
+  const resumeGame       = useGameStore(s => s.resumeGame)
+  const openGameSettings = useGameStore(s => s.openGameSettings)
+  const session          = useSession()
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [pullingTeam, setPullingTeam] = useState<TeamId | null>(null)
@@ -25,8 +26,20 @@ export default function GameSetup() {
       {/* ── Game list ── */}
       <div className="w-64 flex-shrink-0 flex flex-col border-r border-border">
         <div className="px-4 py-3 border-b border-border flex-shrink-0">
-          <Label block className="mb-1">GAME SETUP</Label>
-          <div className="text-base font-bold">Select Game</div>
+          <div className="flex items-start justify-between">
+            <div>
+              <Label block className="mb-1">GAME SETUP</Label>
+              <div className="text-base font-bold">Select Game</div>
+            </div>
+            <button
+              onClick={openGameSettings}
+              className="mt-0.5 text-[18px] leading-none cursor-pointer transition-opacity hover:opacity-70"
+              style={{ color: 'var(--color-dim)' }}
+              title="Recording Settings"
+            >
+              ⚙
+            </button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {MOCK_GAMES.map(g => {
