@@ -42,6 +42,7 @@ interface GameStore {
   confirmLine:       (lineA: Player[], lineB: Player[]) => void
   nextPoint:         () => void
   backToGameList:    () => void
+  reorderActiveLine: (teamId: TeamId, fromIdx: number, toIdx: number) => void
 
   // Recording actions (all funnel through canRecord guards)
   tapPlayer:            (player: Player) => void
@@ -187,6 +188,8 @@ export const useGameStore = create<GameStore>()(
             return
           }
           if (!canRecord(state, onTap.eventType)) return
+          // Receiver Error can't be the thrower — guard against UI bypass
+          if (onTap.eventType === 'turnover-receiver-error' && player.id === state.discHolder) return
           const teamId = onTap.team === 'defending' ? otherTeam(state.possession) : state.possession
           set({
             session: appendEvents(session, [{
@@ -363,6 +366,23 @@ export const useGameStore = create<GameStore>()(
           uiMode:        'idle',
           selPuller:     null,
           showEventMenu: false,
+        })
+      },
+
+      // ── reorderActiveLine ────────────────────────────────────────────────────
+      // Reorders the on-field display order for a team. Pure visual rearrangement.
+      reorderActiveLine(teamId, fromIdx, toIdx) {
+        const { session } = get()
+        if (!session || fromIdx === toIdx) return
+        const line = [...session.activeLine[teamId]]
+        if (fromIdx < 0 || fromIdx >= line.length || toIdx < 0 || toIdx >= line.length) return
+        const [moved] = line.splice(fromIdx, 1)
+        line.splice(toIdx, 0, moved)
+        set({
+          session: {
+            ...session,
+            activeLine: { ...session.activeLine, [teamId]: line },
+          },
         })
       },
 

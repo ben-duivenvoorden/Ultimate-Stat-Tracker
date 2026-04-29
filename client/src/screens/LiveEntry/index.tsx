@@ -110,6 +110,7 @@ export default function LiveEntry() {
               teamColor={teams.A.color}
               teamShort={teams.A.short}
               mode={activeTeam === 'A' ? playerMode : 'normal'}
+              onReorder={(f, t) => actions.reorderActiveLine('A', f, t)}
             />
           )}
         </div>
@@ -124,6 +125,7 @@ export default function LiveEntry() {
               teamShort={teams.B.short}
               mode={activeTeam === 'B' ? playerMode : 'normal'}
               align="right"
+              onReorder={(f, t) => actions.reorderActiveLine('B', f, t)}
             />
           )}
         </div>
