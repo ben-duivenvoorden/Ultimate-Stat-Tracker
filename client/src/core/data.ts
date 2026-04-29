@@ -23,27 +23,27 @@ const EMPIRE = team('A', 'New York Empire', 'NYE', '#1f4788')
 const BREEZE = team('B', 'DC Breeze', 'DCB', '#ff6640')
 
 const EMPIRE_ROSTER: Player[] = [
-  player('a1', 'Matt Geyer', 'A', avatarUrl('MG', '#1f4788')),
-  player('a2', 'Kyle Weigand', 'A', avatarUrl('KW', '#1f4788')),
-  player('a3', 'Brodie Smith', 'A', avatarUrl('BS', '#1f4788')),
-  player('a4', 'Jimmy Mickle', 'A', avatarUrl('JM', '#1f4788')),
-  player('a5', 'Ben Jagt', 'A', avatarUrl('BJ', '#1f4788')),
-  player('a6', 'Chase Reznik', 'A', avatarUrl('CR', '#1f4788')),
-  player('a7', 'David Pfeiffer', 'A', avatarUrl('DP', '#1f4788')),
-  player('a8', 'Brannon Redmond', 'A', avatarUrl('BR', '#1f4788')),
-  player('a9', 'Andrew Hull', 'A', avatarUrl('AH', '#1f4788')),
+  player('a1', 'Alex Atkins', 'A', avatarUrl('AA', '#1f4788')),
+  player('a2', 'Caoba Nichim-Luta', 'A', avatarUrl('CN', '#1f4788')),
+  player('a3', 'Matt LaBar', 'A', avatarUrl('ML', '#1f4788')),
+  player('a4', 'Ben Jagt', 'A', avatarUrl('BJ', '#1f4788')),
+  player('a5', 'Benjamin Simmons', 'A', avatarUrl('BS', '#1f4788')),
+  player('a6', 'Nicholas Whitlock', 'A', avatarUrl('NW', '#1f4788')),
+  player('a7', 'Samuel McCrory', 'A', avatarUrl('SM', '#1f4788')),
+  player('a8', 'Solomon Rueschemeyer-Bailey', 'A', avatarUrl('SR', '#1f4788')),
+  player('a9', 'Tej Murthy', 'A', avatarUrl('TM', '#1f4788')),
 ]
 
 const BREEZE_ROSTER: Player[] = [
-  player('b1', 'Marques Browlee', 'B', avatarUrl('MB', '#ff6640')),
-  player('b2', 'Patrick Smith', 'B', avatarUrl('PS', '#ff6640')),
-  player('b3', 'Ashlin Joye', 'B', avatarUrl('AJ', '#ff6640')),
-  player('b4', 'Trey Katzenmeyer', 'B', avatarUrl('TK', '#ff6640')),
-  player('b5', 'Pio Fernandez', 'B', avatarUrl('PF', '#ff6640')),
-  player('b6', 'Beau Kittredge', 'B', avatarUrl('BK', '#ff6640')),
-  player('b7', 'Nolan Thorne', 'B', avatarUrl('NT', '#ff6640')),
-  player('b8', 'Alex Thorne', 'B', avatarUrl('AT', '#ff6640')),
-  player('b9', 'Kevin Pyle', 'B', avatarUrl('KP', '#ff6640')),
+  player('b1', 'Xavier Schafer', 'B', avatarUrl('XS', '#ff6640')),
+  player('b2', 'Graham Turner', 'B', avatarUrl('GT', '#ff6640')),
+  player('b3', 'Aidan Downey', 'B', avatarUrl('AD', '#ff6640')),
+  player('b4', 'Charlie McCutcheon', 'B', avatarUrl('CM', '#ff6640')),
+  player('b5', 'AJ Merriman', 'B', avatarUrl('AM', '#ff6640')),
+  player('b6', 'Zachary Burpee', 'B', avatarUrl('ZB', '#ff6640')),
+  player('b7', 'Lev Blumenfeld', 'B', avatarUrl('LB', '#ff6640')),
+  player('b8', 'Wiebe van den Brink', 'B', avatarUrl('WV', '#ff6640')),
+  player('b9', 'Ben Greenberg', 'B', avatarUrl('BG', '#ff6640')),
 ]
 
 export const MOCK_GAMES: GameConfig[] = [
