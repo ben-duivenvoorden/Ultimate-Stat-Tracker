@@ -8,31 +8,42 @@ function player(id: string, name: string, teamId: 'A' | 'B', photoUrl?: string):
   return { id, name, teamId, ...(photoUrl ? { photoUrl } : {}) }
 }
 
+function avatarUrl(initials: string, color: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" fill="${color}"/><text x="64" y="75" font-size="48" font-weight="bold" text-anchor="middle" fill="white" font-family="system-ui">${initials}</text></svg>`
+  if (typeof btoa !== 'undefined') {
+    return `data:image/svg+xml;base64,${btoa(svg)}`
+  } else if (typeof Buffer !== 'undefined') {
+    return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
+  } else {
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+  }
+}
+
 const EMPIRE = team('A', 'Sacramento Empire', 'EMP', '#4a9eff')
 const BREEZE = team('B', 'DC Breeze', 'DCB', '#ff6640')
 
 const EMPIRE_ROSTER: Player[] = [
-  player('a1', 'Matt Geyer', 'A', 'https://ui-avatars.com/api/name=MG&background=4a9eff&color=fff&bold=true&size=128'),
-  player('a2', 'Kyle Weigand', 'A', 'https://ui-avatars.com/api/name=KW/background=4a9eff/color=fff&bold=true&size=128'),
-  player('a3', 'Brodie Smith', 'A', 'https://ui-avatars.com/api/name=BS/background=4a9eff/color=fff&bold=true&size=128'),
-  player('a4', 'Jimmy Mickle', 'A', 'https://ui-avatars.com/api/name=JM/background=4a9eff/color=fff&bold=true&size=128'),
-  player('a5', 'Ben Jagt', 'A', 'https://ui-avatars.com/api/name=BJ/background=4a9eff/color=fff&bold=true&size=128'),
-  player('a6', 'Chase Reznik', 'A', 'https://ui-avatars.com/api/name=CR/background=4a9eff/color=fff&bold=true&size=128'),
-  player('a7', 'David Pfeiffer', 'A', 'https://ui-avatars.com/api/name=DP/background=4a9eff/color=fff&bold=true&size=128'),
-  player('a8', 'Brannon Redmond', 'A', 'https://ui-avatars.com/api/name=BR/background=4a9eff/color=fff&bold=true&size=128'),
-  player('a9', 'Andrew Hull', 'A', 'https://ui-avatars.com/api/name=AH/background=4a9eff/color=fff&bold=true&size=128'),
+  player('a1', 'Matt Geyer', 'A', avatarUrl('MG', '#4a9eff')),
+  player('a2', 'Kyle Weigand', 'A', avatarUrl('KW', '#4a9eff')),
+  player('a3', 'Brodie Smith', 'A', avatarUrl('BS', '#4a9eff')),
+  player('a4', 'Jimmy Mickle', 'A', avatarUrl('JM', '#4a9eff')),
+  player('a5', 'Ben Jagt', 'A', avatarUrl('BJ', '#4a9eff')),
+  player('a6', 'Chase Reznik', 'A', avatarUrl('CR', '#4a9eff')),
+  player('a7', 'David Pfeiffer', 'A', avatarUrl('DP', '#4a9eff')),
+  player('a8', 'Brannon Redmond', 'A', avatarUrl('BR', '#4a9eff')),
+  player('a9', 'Andrew Hull', 'A', avatarUrl('AH', '#4a9eff')),
 ]
 
 const BREEZE_ROSTER: Player[] = [
-  player('b1', 'Marques Browlee', 'B', 'https://ui-avatars.com/api/name=MB/background=ff6640/color=fff&bold=true&size=128'),
-  player('b2', 'Patrick Smith', 'B', 'https://ui-avatars.com/api/name=PS/background=ff6640/color=fff&bold=true&size=128'),
-  player('b3', 'Ashlin Joye', 'B', 'https://ui-avatars.com/api/name=AJ/background=ff6640/color=fff&bold=true&size=128'),
-  player('b4', 'Trey Katzenmeyer', 'B', 'https://ui-avatars.com/api/name=TK/background=ff6640/color=fff&bold=true&size=128'),
-  player('b5', 'Pio Fernandez', 'B', 'https://ui-avatars.com/api/name=PF/background=ff6640/color=fff&bold=true&size=128'),
-  player('b6', 'Beau Kittredge', 'B', 'https://ui-avatars.com/api/name=BK/background=ff6640/color=fff&bold=true&size=128'),
-  player('b7', 'Nolan Thorne', 'B', 'https://ui-avatars.com/api/name=NT/background=ff6640/color=fff&bold=true&size=128'),
-  player('b8', 'Alex Thorne', 'B', 'https://ui-avatars.com/api/name=AT/background=ff6640/color=fff&bold=true&size=128'),
-  player('b9', 'Kevin Pyle', 'B', 'https://ui-avatars.com/api/name=KP/background=ff6640/color=fff&bold=true&size=128'),
+  player('b1', 'Marques Browlee', 'B', avatarUrl('MB', '#ff6640')),
+  player('b2', 'Patrick Smith', 'B', avatarUrl('PS', '#ff6640')),
+  player('b3', 'Ashlin Joye', 'B', avatarUrl('AJ', '#ff6640')),
+  player('b4', 'Trey Katzenmeyer', 'B', avatarUrl('TK', '#ff6640')),
+  player('b5', 'Pio Fernandez', 'B', avatarUrl('PF', '#ff6640')),
+  player('b6', 'Beau Kittredge', 'B', avatarUrl('BK', '#ff6640')),
+  player('b7', 'Nolan Thorne', 'B', avatarUrl('NT', '#ff6640')),
+  player('b8', 'Alex Thorne', 'B', avatarUrl('AT', '#ff6640')),
+  player('b9', 'Kevin Pyle', 'B', avatarUrl('KP', '#ff6640')),
 ]
 
 export const MOCK_GAMES: GameConfig[] = [
