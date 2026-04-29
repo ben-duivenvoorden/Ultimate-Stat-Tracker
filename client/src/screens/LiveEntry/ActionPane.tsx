@@ -88,12 +88,12 @@ export function ActionPane({
       ) : (
         <div className="flex-1 p-1.5 flex flex-col gap-0.5 overflow-hidden">
           <Separator>INCOMPLETE</Separator>
-          <ActionTile label="Receiver Error"      variant="danger"  disabled={!armed}                       onClick={onReceiverError} />
+          <ActionTile label="Receiver Error"      variant="warn"    disabled={!armed}                       onClick={onReceiverError} />
           <Separator>TURNOVERS</Separator>
-          <ActionTile label="Throw Away"          variant="danger"  disabled={!armed}                       onClick={onThrowAway} />
-          <ActionTile label="Defensive Block"     variant="block"   disabled={!armed} onClick={() => onDefensiveBlock('block')} />
+          <ActionTile label="Throw Away"          variant="danger"    disabled={!armed}                       onClick={onThrowAway} />
+          <ActionTile label="Defensive Block"     variant="block"     disabled={!armed} onClick={() => onDefensiveBlock('block')} />
           <ActionTile label="Defensive Intercept" variant="intercept" disabled={!armed} onClick={() => onDefensiveBlock('intercept')} />
-          <ActionTile label="Stall"               variant="warn"    disabled={!armed}                       onClick={onStall} />
+          <ActionTile label="Stall"               variant="stall"     disabled={!armed}                       onClick={onStall} />
           <Separator>COMPLETE</Separator>
           <ActionTile label="Goal"                variant="success" disabled={!armed}                       onClick={onGoal} />
         </div>
@@ -140,12 +140,13 @@ export function ActionPane({
 
 // ── Building blocks ────────────────────────────────────────────────────────────
 
-type TileVariant = 'primary' | 'danger' | 'warn' | 'block' | 'intercept' | 'success'
+type TileVariant = 'primary' | 'danger' | 'warn' | 'stall' | 'block' | 'intercept' | 'success'
 
 const tileColors: Record<TileVariant, { bg: string; color: string }> = {
   primary:   { bg: 'var(--color-team-a)',    color: '#fff'            },
   danger:    { bg: 'var(--color-danger)',    color: '#fff'            },
   warn:      { bg: 'var(--color-warn)',      color: 'var(--color-bg)' },
+  stall:     { bg: 'var(--color-stall)',     color: '#fff'            },
   block:     { bg: 'var(--color-block)',     color: '#fff'            },
   intercept: { bg: 'var(--color-intercept)', color: 'var(--color-bg)' },
   success:   { bg: 'var(--color-success)',   color: '#fff'            },
