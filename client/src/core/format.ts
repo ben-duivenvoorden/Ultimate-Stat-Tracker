@@ -40,8 +40,9 @@ export function getVisLogColor(type: VisLogEntry['type']): string {
       return 'var(--color-muted)'
     case 'turnover-throw-away':
     case 'turnover-receiver-error':
-    case 'turnover-stall':
       return 'var(--color-danger)'
+    case 'turnover-stall':
+      return 'var(--color-warn)'
     case 'block':
     case 'intercept':
       return 'var(--color-block)'

@@ -90,10 +90,10 @@ export function ActionPane({
           <Separator>INCOMPLETE</Separator>
           <ActionTile label="Receiver Error"      variant="danger"  disabled={!armed}                       onClick={onReceiverError} />
           <Separator>TURNOVERS</Separator>
-          <ActionTile label="Throw Away"          variant="warn"    disabled={!armed}                       onClick={onThrowAway} />
-          <ActionTile label="Defensive Block"     variant="block"     disabled={!armed} onClick={() => onDefensiveBlock('block')} />
+          <ActionTile label="Throw Away"          variant="danger"  disabled={!armed}                       onClick={onThrowAway} />
+          <ActionTile label="Defensive Block"     variant="block"   disabled={!armed} onClick={() => onDefensiveBlock('block')} />
           <ActionTile label="Defensive Intercept" variant="intercept" disabled={!armed} onClick={() => onDefensiveBlock('intercept')} />
-          <ActionTile label="Stall"               variant="danger"  disabled={!armed}                       onClick={onStall} />
+          <ActionTile label="Stall"               variant="warn"    disabled={!armed}                       onClick={onStall} />
           <Separator>COMPLETE</Separator>
           <ActionTile label="Goal"                variant="success" disabled={!armed}                       onClick={onGoal} />
         </div>
