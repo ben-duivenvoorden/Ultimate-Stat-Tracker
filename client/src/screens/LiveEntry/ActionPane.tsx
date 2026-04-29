@@ -26,7 +26,6 @@ interface ActionPaneProps {
   onFoul:              () => void
   onPick:              () => void
   onTimeout:           () => void
-  onBackToGames:       () => void
   showEventMenu:       boolean
   setShowEventMenu:    (v: boolean) => void
 
@@ -37,7 +36,7 @@ export function ActionPane({
   gamePhase, uiMode, pullerSelected, discHolderName, selPullerName, defendingShort,
   recordingOptions,
   onRecordPull, onThrowAway, onReceiverError, onDefensiveBlock, onGoal,
-  onHalfTime, onEndGame, onInjurySub, onStall, onFoul, onPick, onTimeout, onBackToGames,
+  onHalfTime, onEndGame, onInjurySub, onStall, onFoul, onPick, onTimeout,
   onCancelPickMode,
   showEventMenu, setShowEventMenu,
   terminalProps,
@@ -129,7 +128,6 @@ export function ActionPane({
             <Btn variant="ghost" size="md" full onClick={onTimeout}>Timeout</Btn>
             <Btn variant="ghost" size="md" full onClick={onHalfTime}>Half Time</Btn>
             <Btn variant="ghost" size="md" full onClick={onEndGame}>End Game</Btn>
-            <Btn variant="ghost" size="md" full onClick={onBackToGames}>← Back to Games</Btn>
           </div>
         </>
       )}

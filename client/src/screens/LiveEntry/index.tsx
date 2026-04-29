@@ -175,7 +175,6 @@ export default function LiveEntry() {
             onFoul={actions.recordFoul}
             onPick={actions.recordPick}
             onTimeout={actions.recordTimeout}
-            onBackToGames={actions.backToGameList}
             onCancelPickMode={actions.cancelPickMode}
             showEventMenu={ui.showEventMenu}
             setShowEventMenu={actions.setShowEventMenu}
