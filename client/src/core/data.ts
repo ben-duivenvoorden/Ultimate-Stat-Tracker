@@ -12,27 +12,27 @@ const EMPIRE = team('A', 'Sacramento Empire', 'EMP', '#4a9eff')
 const BREEZE = team('B', 'DC Breeze', 'DCB', '#ff6640')
 
 const EMPIRE_ROSTER: Player[] = [
-  player('a1', 'Matt Geyer', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=MattGeyer'),
-  player('a2', 'Kyle Weigand', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=KyleWeigand'),
-  player('a3', 'Brodie Smith', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=BrodieSmith'),
-  player('a4', 'Jimmy Mickle', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=JimmyMickle'),
-  player('a5', 'Ben Jagt', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=BenJagt'),
-  player('a6', 'Chase Reznik', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=ChaseReznik'),
-  player('a7', 'David Pfeiffer', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=DavidPfeiffer'),
-  player('a8', 'Brannon Redmond', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=BrannonRedmond'),
-  player('a9', 'Andrew Hull', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=AndrewHull'),
+  player('a1', 'Matt Geyer', 'A', 'https://randomuser.me/api/portraits/men/1.jpg'),
+  player('a2', 'Kyle Weigand', 'A', 'https://randomuser.me/api/portraits/men/2.jpg'),
+  player('a3', 'Brodie Smith', 'A', 'https://randomuser.me/api/portraits/men/3.jpg'),
+  player('a4', 'Jimmy Mickle', 'A', 'https://randomuser.me/api/portraits/men/4.jpg'),
+  player('a5', 'Ben Jagt', 'A', 'https://randomuser.me/api/portraits/men/5.jpg'),
+  player('a6', 'Chase Reznik', 'A', 'https://randomuser.me/api/portraits/men/6.jpg'),
+  player('a7', 'David Pfeiffer', 'A', 'https://randomuser.me/api/portraits/men/7.jpg'),
+  player('a8', 'Brannon Redmond', 'A', 'https://randomuser.me/api/portraits/men/8.jpg'),
+  player('a9', 'Andrew Hull', 'A', 'https://randomuser.me/api/portraits/men/9.jpg'),
 ]
 
 const BREEZE_ROSTER: Player[] = [
-  player('b1', 'Marques Browlee', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=MarquesBrowlee'),
-  player('b2', 'Patrick Smith', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=PatrickSmith'),
-  player('b3', 'Ashlin Joye', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=AshlinJoye'),
-  player('b4', 'Trey Katzenmeyer', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=TreyKatzenmeyer'),
-  player('b5', 'Pio Fernandez', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=PioFernandez'),
-  player('b6', 'Beau Kittredge', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=BeauKittredge'),
-  player('b7', 'Nolan Thorne', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=NolanThorne'),
-  player('b8', 'Alex Thorne', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=AlexThorne'),
-  player('b9', 'Kevin Pyle', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=KevinPyle'),
+  player('b1', 'Marques Browlee', 'B', 'https://randomuser.me/api/portraits/men/10.jpg'),
+  player('b2', 'Patrick Smith', 'B', 'https://randomuser.me/api/portraits/men/11.jpg'),
+  player('b3', 'Ashlin Joye', 'B', 'https://randomuser.me/api/portraits/women/1.jpg'),
+  player('b4', 'Trey Katzenmeyer', 'B', 'https://randomuser.me/api/portraits/men/12.jpg'),
+  player('b5', 'Pio Fernandez', 'B', 'https://randomuser.me/api/portraits/men/13.jpg'),
+  player('b6', 'Beau Kittredge', 'B', 'https://randomuser.me/api/portraits/men/14.jpg'),
+  player('b7', 'Nolan Thorne', 'B', 'https://randomuser.me/api/portraits/men/15.jpg'),
+  player('b8', 'Alex Thorne', 'B', 'https://randomuser.me/api/portraits/men/16.jpg'),
+  player('b9', 'Kevin Pyle', 'B', 'https://randomuser.me/api/portraits/men/17.jpg'),
 ]
 
 export const MOCK_GAMES: GameConfig[] = [
