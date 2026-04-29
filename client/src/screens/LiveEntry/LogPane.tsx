@@ -4,19 +4,6 @@ import { Label } from '@/components/ui/Label'
 import { Btn } from '@/components/ui/Btn'
 import { formatVisLogEntry, getVisLogColor, isMutedLogEntry } from '@/core/format'
 
-// A trimmed-down ghost button — shorter than Btn size="xs" so its edges
-// don't touch the surrounding header dividers.
-function EditPill() {
-  return (
-    <button
-      type="button"
-      className="h-5 px-2 text-[10px] rounded font-semibold border bg-transparent text-muted border-border hover:text-content hover:border-border-2 cursor-pointer transition-colors"
-    >
-      Edit
-    </button>
-  )
-}
-
 interface LogPaneProps {
   visLog: VisLogEntry[]
   players: Player[]
@@ -37,11 +24,10 @@ export function LogPane({ visLog, players, isGameOver, onUndo, onExport }: LogPa
   return (
     <div className="flex-1 flex flex-col" style={{ minWidth: 0 }}>
       <div
-        className="flex-shrink-0 h-7 flex items-center justify-between px-2.5"
+        className="flex-shrink-0 h-7 flex items-center justify-center px-2.5"
         style={{ borderBottom: '1px solid var(--color-border)' }}
       >
         <Label>EVENT LOG</Label>
-        {!isGameOver && <EditPill />}
       </div>
 
       <div ref={logRef} className="flex-1 p-1.5 flex flex-col gap-0.5 overflow-y-auto">
