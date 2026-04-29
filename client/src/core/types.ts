@@ -133,12 +133,14 @@ export interface RecordingOptions {
   pullBonus: boolean
   foul:      boolean
   pick:      boolean
+  stall:     boolean
 }
 
 export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
   pullBonus: true,
   foul:      false,
   pick:      false,
+  stall:     false,
 }
 
 // ─── Game config & session ────────────────────────────────────────────────────

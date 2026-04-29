@@ -1,4 +1,5 @@
 import { useSession, useDerivedState, useVisLog, useGameActions, useUiState, useRecordingOptions } from '@/core/selectors'
+import { useGameStore } from '@/core/store'
 import { otherTeam, type TeamId } from '@/core/types'
 import { Label } from '@/components/ui/Label'
 import { PlayerPane, type PlayerPaneMode } from './PlayerPane'
@@ -13,6 +14,7 @@ export default function LiveEntry() {
   const ui              = useUiState()
   const actions         = useGameActions()
   const recordingOptions = useRecordingOptions()
+  const backToGameList  = useGameStore(s => s.backToGameList)
 
   if (!session || !state) return null
 
@@ -87,9 +89,19 @@ export default function LiveEntry() {
         className="flex-shrink-0 flex items-center justify-between px-4 h-6 text-[9px] font-mono tracking-widest"
         style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-dim)' }}
       >
-        <span style={{ color: attackingTeam.color }}>{attackingTeam.short} ←</span>
-        <span>ATTACKING →</span>
-        <span style={{ color: defendingTeam.color }}>→ {defendingTeam.short}</span>
+        <button
+          onClick={backToGameList}
+          className="text-muted hover:text-content transition-colors cursor-pointer"
+          title="Back to games"
+        >
+          ←
+        </button>
+        <div className="flex-1 flex items-center justify-center gap-6">
+          <span style={{ color: attackingTeam.color }}>{attackingTeam.short} ←</span>
+          <span>ATTACKING →</span>
+          <span style={{ color: defendingTeam.color }}>→ {defendingTeam.short}</span>
+        </div>
+        <div className="w-5" />
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">

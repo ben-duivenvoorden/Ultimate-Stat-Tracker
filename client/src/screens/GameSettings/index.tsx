@@ -49,6 +49,14 @@ export default function GameSettings() {
           onChange={v => updateRecordingOption('pick', v)}
         />
 
+        <SectionHeading>TURNOVERS</SectionHeading>
+        <SettingRow
+          label="Stall"
+          description="Record stall violations as a turnover"
+          checked={options.stall}
+          onChange={v => updateRecordingOption('stall', v)}
+        />
+
         <div
           className="mt-4 px-3 py-2.5 rounded-lg text-[11px]"
           style={{ background: 'var(--color-surf-2)', color: 'var(--color-muted)', border: '1px solid var(--color-border)' }}

@@ -8,72 +8,72 @@ function player(id: string, name: string, teamId: 'A' | 'B', photoUrl?: string):
   return { id, name, teamId, ...(photoUrl ? { photoUrl } : {}) }
 }
 
-const BRI = team('A', 'Brisbanites', 'BRI', '#4a9eff')
-const EXT = team('B', 'Extinction',  'EXT', '#ff6640')
+const EMPIRE = team('A', 'Sacramento Empire', 'EMP', '#4a9eff')
+const BREEZE = team('B', 'DC Breeze', 'DCB', '#ff6640')
 
-const BRI_ROSTER: Player[] = [
-  player('a1', 'Sam W',     'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=SamW'),
-  player('a2', 'Jordan K',  'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=JordanK'),
-  player('a3', 'Mia T',     'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=MiaT'),
-  player('a4', 'Lachlan B', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=LachlanB'),
-  player('a5', 'Priya S',   'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=PriyaS'),
-  player('a6', 'Tom H',     'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=TomH'),
-  player('a7', 'Evie R',    'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=EvieR'),
-  player('a8', 'Kai M',     'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=KaiM'),
-  player('a9', 'Dana F',    'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=DanaF'),
+const EMPIRE_ROSTER: Player[] = [
+  player('a1', 'Matt Geyer', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=MattGeyer'),
+  player('a2', 'Kyle Weigand', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=KyleWeigand'),
+  player('a3', 'Brodie Smith', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=BrodieSmith'),
+  player('a4', 'Jimmy Mickle', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=JimmyMickle'),
+  player('a5', 'Ben Jagt', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=BenJagt'),
+  player('a6', 'Chase Reznik', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=ChaseReznik'),
+  player('a7', 'David Pfeiffer', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=DavidPfeiffer'),
+  player('a8', 'Brannon Redmond', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=BrannonRedmond'),
+  player('a9', 'Andrew Hull', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=AndrewHull'),
 ]
 
-const EXT_ROSTER: Player[] = [
-  player('b1', 'Callum D',  'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=CallumD'),
-  player('b2', 'Jess O',    'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=JessO'),
-  player('b3', 'Marcus L',  'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=MarcusL'),
-  player('b4', 'Tara N',    'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=TaraN'),
-  player('b5', 'Flynn M',   'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=FlynnM'),
-  player('b6', 'Soph C',    'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=SophC'),
-  player('b7', 'Rhys P',    'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=RhysP'),
-  player('b8', 'Ava G',     'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=AvaG'),
-  player('b9', 'Zane T',    'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=ZaneT'),
+const BREEZE_ROSTER: Player[] = [
+  player('b1', 'Marques Browlee', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=MarquesBrowlee'),
+  player('b2', 'Patrick Smith', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=PatrickSmith'),
+  player('b3', 'Ashlin Joye', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=AshlinJoye'),
+  player('b4', 'Trey Katzenmeyer', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=TreyKatzenmeyer'),
+  player('b5', 'Pio Fernandez', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=PioFernandez'),
+  player('b6', 'Beau Kittredge', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=BeauKittredge'),
+  player('b7', 'Nolan Thorne', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=NolanThorne'),
+  player('b8', 'Alex Thorne', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=AlexThorne'),
+  player('b9', 'Kevin Pyle', 'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=KevinPyle'),
 ]
 
 export const MOCK_GAMES: GameConfig[] = [
   {
     id: 1,
-    name: 'Pool Play — Round 1',
+    name: 'Empire vs Breeze',
     scheduledTime: '09:00',
     status: 'scheduled',
-    teams: { A: BRI, B: EXT },
-    rosters: { A: BRI_ROSTER, B: EXT_ROSTER },
+    teams: { A: EMPIRE, B: BREEZE },
+    rosters: { A: EMPIRE_ROSTER, B: BREEZE_ROSTER },
     halfTimeAt: 8,
     scoreCapAt: 15,
   },
   {
     id: 2,
-    name: 'Pool Play — Round 2',
+    name: 'AUDL Summer Series',
     scheduledTime: '11:30',
     status: 'in-progress',
-    score: { A: 5, B: 4 },
-    teams: { A: BRI, B: EXT },
-    rosters: { A: BRI_ROSTER, B: EXT_ROSTER },
+    score: { A: 7, B: 6 },
+    teams: { A: EMPIRE, B: BREEZE },
+    rosters: { A: EMPIRE_ROSTER, B: BREEZE_ROSTER },
     halfTimeAt: 8,
     scoreCapAt: 15,
   },
   {
     id: 3,
-    name: 'Crossover',
+    name: 'Playoffs Match 1',
     scheduledTime: '14:00',
     status: 'scheduled',
-    teams: { A: BRI, B: EXT },
-    rosters: { A: BRI_ROSTER, B: EXT_ROSTER },
+    teams: { A: EMPIRE, B: BREEZE },
+    rosters: { A: EMPIRE_ROSTER, B: BREEZE_ROSTER },
     halfTimeAt: 8,
     scoreCapAt: 15,
   },
   {
     id: 4,
-    name: 'Semi-Final',
+    name: 'Championship',
     scheduledTime: '16:30',
     status: 'scheduled',
-    teams: { A: BRI, B: EXT },
-    rosters: { A: BRI_ROSTER, B: EXT_ROSTER },
+    teams: { A: EMPIRE, B: BREEZE },
+    rosters: { A: EMPIRE_ROSTER, B: BREEZE_ROSTER },
     halfTimeAt: 8,
     scoreCapAt: 15,
   },

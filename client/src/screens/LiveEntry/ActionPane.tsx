@@ -93,7 +93,9 @@ export function ActionPane({
           <ActionTile label="Throw Away"          variant="danger"    disabled={!armed}                       onClick={onThrowAway} />
           <ActionTile label="Defensive Block"     variant="block"     disabled={!armed} onClick={() => onDefensiveBlock('block')} />
           <ActionTile label="Defensive Intercept" variant="intercept" disabled={!armed} onClick={() => onDefensiveBlock('intercept')} />
-          <ActionTile label="Stall"               variant="stall"     disabled={!armed}                       onClick={onStall} />
+          {recordingOptions.stall && (
+            <ActionTile label="Stall"               variant="stall"     disabled={!armed}                       onClick={onStall} />
+          )}
           <Separator>COMPLETE</Separator>
           <ActionTile label="Goal"                variant="success" disabled={!armed}                       onClick={onGoal} />
         </div>
