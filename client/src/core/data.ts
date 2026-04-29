@@ -12,27 +12,27 @@ const BRI = team('A', 'Brisbanites', 'BRI', '#4a9eff')
 const EXT = team('B', 'Extinction',  'EXT', '#ff6640')
 
 const BRI_ROSTER: Player[] = [
-  player('a1', 'Sam W',     'A', 'https://i.pravatar.cc/40?img=1'),
-  player('a2', 'Jordan K',  'A', 'https://i.pravatar.cc/40?img=2'),
-  player('a3', 'Mia T',     'A', 'https://i.pravatar.cc/40?img=5'),
-  player('a4', 'Lachlan B', 'A', 'https://i.pravatar.cc/40?img=3'),
-  player('a5', 'Priya S',   'A', 'https://i.pravatar.cc/40?img=6'),
-  player('a6', 'Tom H',     'A', 'https://i.pravatar.cc/40?img=12'),
-  player('a7', 'Evie R',    'A', 'https://i.pravatar.cc/40?img=9'),
-  player('a8', 'Kai M',     'A', 'https://i.pravatar.cc/40?img=7'),
-  player('a9', 'Dana F',    'A', 'https://i.pravatar.cc/40?img=14'),
+  player('a1', 'Sam W',     'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=SamW'),
+  player('a2', 'Jordan K',  'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=JordanK'),
+  player('a3', 'Mia T',     'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=MiaT'),
+  player('a4', 'Lachlan B', 'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=LachlanB'),
+  player('a5', 'Priya S',   'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=PriyaS'),
+  player('a6', 'Tom H',     'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=TomH'),
+  player('a7', 'Evie R',    'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=EvieR'),
+  player('a8', 'Kai M',     'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=KaiM'),
+  player('a9', 'Dana F',    'A', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=DanaF'),
 ]
 
 const EXT_ROSTER: Player[] = [
-  player('b1', 'Callum D',  'B', 'https://i.pravatar.cc/40?img=18'),
-  player('b2', 'Jess O',    'B', 'https://i.pravatar.cc/40?img=17'),
-  player('b3', 'Marcus L',  'B', 'https://i.pravatar.cc/40?img=19'),
-  player('b4', 'Tara N',    'B', 'https://i.pravatar.cc/40?img=21'),
-  player('b5', 'Flynn M',   'B', 'https://i.pravatar.cc/40?img=20'),
-  player('b6', 'Soph C',    'B', 'https://i.pravatar.cc/40?img=25'),
-  player('b7', 'Rhys P',    'B', 'https://i.pravatar.cc/40?img=26'),
-  player('b8', 'Ava G',     'B', 'https://i.pravatar.cc/40?img=29'),
-  player('b9', 'Zane T',    'B', 'https://i.pravatar.cc/40?img=30'),
+  player('b1', 'Callum D',  'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=CallumD'),
+  player('b2', 'Jess O',    'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=JessO'),
+  player('b3', 'Marcus L',  'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=MarcusL'),
+  player('b4', 'Tara N',    'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=TaraN'),
+  player('b5', 'Flynn M',   'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=FlynnM'),
+  player('b6', 'Soph C',    'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=SophC'),
+  player('b7', 'Rhys P',    'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=RhysP'),
+  player('b8', 'Ava G',     'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=AvaG'),
+  player('b9', 'Zane T',    'B', 'https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=ZaneT'),
 ]
 
 export const MOCK_GAMES: GameConfig[] = [
