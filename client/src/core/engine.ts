@@ -113,10 +113,15 @@ export function deriveGameState(session: GameSession): DerivedGameState {
         break
 
       case 'block':
-      case 'intercept':
-        // event.teamId is the defender's team — possession flips to them
         state.possession = event.teamId
         state.discHolder = null
+        break
+
+      case 'intercept':
+        // event.teamId is the intercepting team — possession flips to them
+        // The interceptor (event.playerId) immediately has the disc
+        state.possession = event.teamId
+        state.discHolder = event.playerId
         break
 
       case 'goal':
