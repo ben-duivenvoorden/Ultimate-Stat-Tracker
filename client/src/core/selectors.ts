@@ -39,6 +39,8 @@ export function useGameActions() {
     triggerDefBlock:     s.triggerDefBlock,
     recordFoul:          s.recordFoul,
     recordPick:          s.recordPick,
+    recordStall:         s.recordStall,
+    recordTimeout:       s.recordTimeout,
     undo:                s.undo,
     triggerHalfTime:     s.triggerHalfTime,
     triggerEndGame:      s.triggerEndGame,

@@ -51,6 +51,8 @@ interface GameStore {
   triggerDefBlock:     (type: 'block' | 'intercept') => void
   recordFoul:          () => void
   recordPick:          () => void
+  recordStall:         () => void
+  recordTimeout:       () => void
   undo:                () => void
   triggerHalfTime:     () => void
   triggerEndGame:      () => void
@@ -396,6 +398,32 @@ export const useGameStore = create<GameStore>()(
         if (!canRecord(state, 'pick')) return
         set({
           session: appendEvents(session, [{ ...baseRawEvent(state.pointIndex), type: 'pick' }]),
+          showEventMenu: false,
+        })
+      },
+
+      recordStall() {
+        const { session } = get()
+        if (!session) return
+        const state = deriveGameState(session)
+        if (!canRecord(state, 'turnover-stall') || !state.discHolder) return
+        set({
+          session: appendEvents(session, [{
+            ...baseRawEvent(state.pointIndex),
+            type:     'turnover-stall',
+            playerId: state.discHolder,
+            teamId:   state.possession,
+          }]),
+        })
+      },
+
+      recordTimeout() {
+        const { session } = get()
+        if (!session) return
+        const state = deriveGameState(session)
+        if (!canRecord(state, 'timeout')) return
+        set({
+          session: appendEvents(session, [{ ...baseRawEvent(state.pointIndex), type: 'timeout' }]),
           showEventMenu: false,
         })
       },

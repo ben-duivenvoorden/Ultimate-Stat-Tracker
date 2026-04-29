@@ -17,12 +17,14 @@ export function formatVisLogEntry(entry: VisLogEntry, players: Player[]): string
     case 'possession':               return `→ ${name(entry.playerId)}`
     case 'turnover-throw-away':      return `Throw Away — ${name(entry.playerId)}`
     case 'turnover-receiver-error':  return `Receiver Error — ${name(entry.playerId)}`
+    case 'turnover-stall':           return `Stall — ${name(entry.playerId)}`
     case 'block':                    return `Block — ${name(entry.playerId)}`
     case 'intercept':                return `Intercept — ${name(entry.playerId)}`
     case 'goal':                     return `Goal — ${name(entry.playerId)}`
     case 'injury-sub':               return `Injury Sub — ${name(entry.outPlayerId)} → ${name(entry.inPlayerId)}`
     case 'half-time':                return '— Half Time —'
     case 'end-game':                 return '— Game Over —'
+    case 'timeout':                  return 'Timeout'
     case 'foul':                     return 'Foul'
     case 'pick':                     return 'Pick'
     case 'system':                   return entry.text
@@ -38,6 +40,7 @@ export function getVisLogColor(type: VisLogEntry['type']): string {
       return 'var(--color-muted)'
     case 'turnover-throw-away':
     case 'turnover-receiver-error':
+    case 'turnover-stall':
       return 'var(--color-danger)'
     case 'block':
     case 'intercept':
@@ -45,6 +48,7 @@ export function getVisLogColor(type: VisLogEntry['type']): string {
     case 'goal':
       return 'var(--color-success)'
     case 'injury-sub':
+    case 'timeout':
     case 'foul':
     case 'pick':
       return 'var(--color-warn)'

@@ -164,8 +164,10 @@ export default function LiveEntry() {
             onHalfTime={actions.triggerHalfTime}
             onEndGame={actions.triggerEndGame}
             onInjurySub={actions.triggerInjurySub}
+            onStall={actions.recordStall}
             onFoul={actions.recordFoul}
             onPick={actions.recordPick}
+            onTimeout={actions.recordTimeout}
             onBackToGames={actions.backToGameList}
             showEventMenu={ui.showEventMenu}
             setShowEventMenu={actions.setShowEventMenu}

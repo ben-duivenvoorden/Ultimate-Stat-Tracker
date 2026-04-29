@@ -20,8 +20,10 @@ interface ActionPaneProps {
   onHalfTime:          () => void
   onEndGame:           () => void
   onInjurySub:         () => void
+  onStall:             () => void
   onFoul:              () => void
   onPick:              () => void
+  onTimeout:           () => void
   onBackToGames:       () => void
   showEventMenu:       boolean
   setShowEventMenu:    (v: boolean) => void
@@ -33,7 +35,7 @@ export function ActionPane({
   gamePhase, uiMode, pullerSelected, discHolderName, selPullerName, defendingShort,
   recordingOptions,
   onRecordPull, onThrowAway, onReceiverError, onDefensiveBlock, onGoal,
-  onHalfTime, onEndGame, onInjurySub, onFoul, onPick, onBackToGames,
+  onHalfTime, onEndGame, onInjurySub, onStall, onFoul, onPick, onTimeout, onBackToGames,
   showEventMenu, setShowEventMenu,
   terminalProps,
 }: ActionPaneProps) {
@@ -87,10 +89,11 @@ export function ActionPane({
         <div className="flex-1 p-1.5 flex flex-col gap-0.5 overflow-hidden">
           <Separator>INCOMPLETE</Separator>
           <ActionTile label="Receiver Error"      variant="danger"  disabled={!armed}                       onClick={onReceiverError} />
-          <Separator>TURNOVER</Separator>
+          <Separator>TURNOVERS</Separator>
           <ActionTile label="Throw Away"          variant="warn"    disabled={!armed}                       onClick={onThrowAway} />
           <ActionTile label="Defensive Block"     variant="block"     disabled={!armed} onClick={() => onDefensiveBlock('block')} />
           <ActionTile label="Defensive Intercept" variant="intercept" disabled={!armed} onClick={() => onDefensiveBlock('intercept')} />
+          <ActionTile label="Stall"               variant="danger"  disabled={!armed}                       onClick={onStall} />
           <Separator>COMPLETE</Separator>
           <ActionTile label="Goal"                variant="success" disabled={!armed}                       onClick={onGoal} />
         </div>
@@ -124,6 +127,7 @@ export function ActionPane({
             {recordingOptions.pick && (
               <Btn variant="ghost" size="md" full onClick={onPick}>Pick</Btn>
             )}
+            <Btn variant="ghost" size="md" full onClick={onTimeout}>Timeout</Btn>
             <Btn variant="ghost" size="md" full onClick={onHalfTime}>Half Time</Btn>
             <Btn variant="ghost" size="md" full onClick={onEndGame}>End Game</Btn>
             <Btn variant="ghost" size="md" full onClick={onBackToGames}>← Back to Games</Btn>

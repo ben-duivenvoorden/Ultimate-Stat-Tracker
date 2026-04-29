@@ -107,6 +107,7 @@ export function deriveGameState(session: GameSession): DerivedGameState {
 
       case 'turnover-throw-away':
       case 'turnover-receiver-error':
+      case 'turnover-stall':
         state.possession = otherTeam(state.possession)
         state.discHolder = null
         break
@@ -146,6 +147,7 @@ export function deriveGameState(session: GameSession): DerivedGameState {
 
       case 'foul':
       case 'pick':
+      case 'timeout':
         // Stoppages — logged but no state change
         break
 
@@ -179,6 +181,7 @@ export function canRecord(state: DerivedGameState, eventType: RawEventType): boo
 
     case 'turnover-throw-away':
     case 'turnover-receiver-error':
+    case 'turnover-stall':
     case 'goal':
       return state.gamePhase === 'in-play' && state.discHolder !== null
 
@@ -195,6 +198,7 @@ export function canRecord(state: DerivedGameState, eventType: RawEventType): boo
 
     case 'foul':
     case 'pick':
+    case 'timeout':
       return state.gamePhase === 'in-play' || state.gamePhase === 'awaiting-pull'
 
     case 'system':

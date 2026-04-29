@@ -39,8 +39,10 @@ export type RawEventType =
   | 'possession'
   | 'turnover-throw-away'
   | 'turnover-receiver-error'
+  | 'turnover-stall'
   | 'block'
   | 'intercept'
+  | 'timeout'
   | 'goal'
   | 'injury-sub'
   | 'half-time'
@@ -60,12 +62,13 @@ interface BaseRawEvent {
 export interface PointStartRawEvent extends BaseRawEvent { type: 'point-start' }
 export interface PullRawEvent       extends BaseRawEvent { type: 'pull' | 'pull-bonus'; playerId: PlayerId; teamId: TeamId }
 export interface PossessionRawEvent extends BaseRawEvent { type: 'possession';          playerId: PlayerId; teamId: TeamId }
-export interface TurnoverRawEvent   extends BaseRawEvent { type: 'turnover-throw-away' | 'turnover-receiver-error'; playerId: PlayerId; teamId: TeamId }
+export interface TurnoverRawEvent   extends BaseRawEvent { type: 'turnover-throw-away' | 'turnover-receiver-error' | 'turnover-stall'; playerId: PlayerId; teamId: TeamId }
 export interface BlockRawEvent      extends BaseRawEvent { type: 'block' | 'intercept'; playerId: PlayerId; teamId: TeamId }
 export interface GoalRawEvent       extends BaseRawEvent { type: 'goal';                playerId: PlayerId; teamId: TeamId }
 export interface InjurySubRawEvent  extends BaseRawEvent { type: 'injury-sub';          outPlayerId: PlayerId; inPlayerId: PlayerId; teamId: TeamId }
 export interface HalfTimeRawEvent   extends BaseRawEvent { type: 'half-time' }
 export interface EndGameRawEvent    extends BaseRawEvent { type: 'end-game' }
+export interface TimeoutRawEvent    extends BaseRawEvent { type: 'timeout' }
 export interface FoulRawEvent       extends BaseRawEvent { type: 'foul' }
 export interface PickRawEvent       extends BaseRawEvent { type: 'pick' }
 export interface SystemRawEvent     extends BaseRawEvent { type: 'system'; text: string }
@@ -82,6 +85,7 @@ export type RawEvent =
   | InjurySubRawEvent
   | HalfTimeRawEvent
   | EndGameRawEvent
+  | TimeoutRawEvent
   | FoulRawEvent
   | PickRawEvent
   | SystemRawEvent
