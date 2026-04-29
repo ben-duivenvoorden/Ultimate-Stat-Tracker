@@ -12,7 +12,7 @@ const EMPIRE = team('A', 'Sacramento Empire', 'EMP', '#4a9eff')
 const BREEZE = team('B', 'DC Breeze', 'DCB', '#ff6640')
 
 const EMPIRE_ROSTER: Player[] = [
-  player('a1', 'Matt Geyer', 'A', 'https://ui-avatars.com/api/name=MG/background=4a9eff/color=fff&bold=true&size=128'),
+  player('a1', 'Matt Geyer', 'A', 'https://ui-avatars.com/api/name=MG&background=4a9eff&color=fff&bold=true&size=128'),
   player('a2', 'Kyle Weigand', 'A', 'https://ui-avatars.com/api/name=KW/background=4a9eff/color=fff&bold=true&size=128'),
   player('a3', 'Brodie Smith', 'A', 'https://ui-avatars.com/api/name=BS/background=4a9eff/color=fff&bold=true&size=128'),
   player('a4', 'Jimmy Mickle', 'A', 'https://ui-avatars.com/api/name=JM/background=4a9eff/color=fff&bold=true&size=128'),
