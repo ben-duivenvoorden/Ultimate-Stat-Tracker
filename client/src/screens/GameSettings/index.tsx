@@ -57,6 +57,24 @@ export default function GameSettings() {
           onChange={v => updateRecordingOption('stall', v)}
         />
 
+        <SectionHeading>LINE COMPOSITION</SectionHeading>
+        <StepperRow
+          label="Male Matching"
+          description="Number of male-matching players per line"
+          value={options.lineRatio.M}
+          onChange={v => updateRecordingOption('lineRatio', { ...options.lineRatio, M: v })}
+          min={0}
+          max={9}
+        />
+        <StepperRow
+          label="Female Matching"
+          description="Number of female-matching players per line"
+          value={options.lineRatio.F}
+          onChange={v => updateRecordingOption('lineRatio', { ...options.lineRatio, F: v })}
+          min={0}
+          max={9}
+        />
+
         <div
           className="mt-4 px-3 py-2.5 rounded-lg text-[11px]"
           style={{ background: 'var(--color-surf-2)', color: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
@@ -107,6 +125,55 @@ function SettingRow({ label, description, checked, onChange }: SettingRowProps) 
       </div>
       <Toggle checked={checked} />
     </div>
+  )
+}
+
+interface StepperRowProps {
+  label:       string
+  description: string
+  value:       number
+  min:         number
+  max:         number
+  onChange:    (v: number) => void
+}
+
+function StepperRow({ label, description, value, min, max, onChange }: StepperRowProps) {
+  return (
+    <div
+      className="flex items-center justify-between gap-4 px-3 py-3 rounded-lg border"
+      style={{
+        background:  'var(--color-surf-2)',
+        borderColor: 'var(--color-border-2)',
+      }}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold text-content leading-none mb-1">{label}</div>
+        <div className="text-[11px]" style={{ color: 'var(--color-muted)' }}>{description}</div>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <StepperButton onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min}>−</StepperButton>
+        <span className="w-6 text-center text-base font-bold tabular-nums">{value}</span>
+        <StepperButton onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max}>+</StepperButton>
+      </div>
+    </div>
+  )
+}
+
+function StepperButton({ children, onClick, disabled }: { children: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="w-8 h-8 rounded-md border text-base font-bold cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-default"
+      style={{
+        background:  'var(--color-surf-3)',
+        borderColor: 'var(--color-border-2)',
+        color:       'var(--color-content)',
+      }}
+    >
+      {children}
+    </button>
   )
 }
 

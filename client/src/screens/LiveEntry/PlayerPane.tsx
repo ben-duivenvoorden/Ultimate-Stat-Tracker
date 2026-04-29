@@ -163,7 +163,17 @@ export function PlayerPane({
                     style={{ background: isIneligible ? 'var(--color-border)' : isPickMode ? activeColor : isHighlit ? teamColor : 'var(--color-border)' }}
                   />
                 )}
-                <span className="text-sm leading-none">{p.name}</span>
+                <span className="text-sm leading-none">
+                  {p.jerseyNumber !== undefined && (
+                    <span
+                      className="font-mono mr-1.5"
+                      style={{ color: isIneligible ? 'var(--color-dim)' : 'var(--color-muted)' }}
+                    >
+                      #{p.jerseyNumber}
+                    </span>
+                  )}
+                  {p.name}
+                </span>
               </button>
               {onReorder && (
                 <span

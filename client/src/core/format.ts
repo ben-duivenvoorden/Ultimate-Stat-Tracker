@@ -65,3 +65,33 @@ export function getVisLogColor(type: VisLogEntry['type']): string {
 export function isMutedLogEntry(type: VisLogEntry['type']): boolean {
   return type === 'possession' || type === 'system' || type === 'point-start'
 }
+
+// Events that put the game into a "dead disc / waiting for pickup" state
+// (gamePhase = 'in-play' with no discHolder).
+export type DeadDiscEventType =
+  | 'pull' | 'pull-bonus'
+  | 'turnover-throw-away' | 'turnover-receiver-error' | 'turnover-stall'
+  | 'block'
+
+export function deadDiscLabel(type: DeadDiscEventType): string {
+  switch (type) {
+    case 'pull':
+    case 'pull-bonus':              return 'DEAD DISC AFTER PULL'
+    case 'turnover-throw-away':     return 'DEAD DISC AFTER THROW AWAY'
+    case 'turnover-receiver-error': return 'DEAD DISC AFTER RECEIVER ERROR'
+    case 'turnover-stall':          return 'DEAD DISC AFTER STALL'
+    case 'block':                   return 'DEAD DISC AFTER DEFENSIVE BLOCK'
+  }
+}
+
+export function lastDeadDiscEvent(visLog: VisLogEntry[]): DeadDiscEventType | null {
+  for (let i = visLog.length - 1; i >= 0; i--) {
+    const t = visLog[i].type
+    if (t === 'pull' || t === 'pull-bonus'
+     || t === 'turnover-throw-away' || t === 'turnover-receiver-error' || t === 'turnover-stall'
+     || t === 'block') {
+      return t
+    }
+  }
+  return null
+}

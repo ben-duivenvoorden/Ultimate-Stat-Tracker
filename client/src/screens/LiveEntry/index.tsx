@@ -2,7 +2,7 @@ import { useSession, useDerivedState, useVisLog, useGameActions, useUiState, use
 import { useGameStore } from '@/core/store'
 import { otherTeam } from '@/core/types'
 import { isPickMode, pickActiveTeam } from '@/core/pickModes'
-import { Label } from '@/components/ui/Label'
+import { lastDeadDiscEvent } from '@/core/format'
 import { PlayerPane, type PlayerPaneMode } from './PlayerPane'
 import { ActionPane } from './ActionPane'
 import { LogPane } from './LogPane'
@@ -158,6 +158,7 @@ export default function LiveEntry() {
             selPullerName={selPullerName}
             defendingShort={teams[otherTeam(state.possession)].short}
             recordingOptions={recordingOptions}
+            deadDiscEvent={lastDeadDiscEvent(visLog)}
             onRecordPull={actions.recordPull}
             onThrowAway={actions.recordThrowAway}
             onReceiverError={actions.triggerReceiverError}
@@ -178,20 +179,6 @@ export default function LiveEntry() {
         </div>
 
 
-</div>
-
-      {/* Dev state strip */}
-      <div
-        className="flex-shrink-0 flex items-center px-4 h-5 text-[9px] font-mono"
-        style={{ borderTop: '1px solid var(--color-border)', color: 'var(--color-dim)' }}
-      >
-        <Label className="text-[9px]">{state.gamePhase}</Label>
-        <span className="mx-2 text-border">·</span>
-        <Label className="text-[9px]">ui: {ui.uiMode}</Label>
-        <span className="mx-2 text-border">·</span>
-        <Label className="text-[9px]">poss: {teams[state.possession].short}</Label>
-        <span className="mx-2 text-border">·</span>
-        <Label className="text-[9px]">attackL: {teams[state.attackLeft].short}</Label>
       </div>
     </div>
   )

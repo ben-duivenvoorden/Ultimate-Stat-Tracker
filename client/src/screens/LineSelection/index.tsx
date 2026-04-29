@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Btn } from '@/components/ui/Btn'
 import { Chip } from '@/components/ui/Chip'
 import { Label } from '@/components/ui/Label'
-import { useSession } from '@/core/selectors'
+import { useSession, useRecordingOptions } from '@/core/selectors'
 import { useGameStore } from '@/core/store'
 import type { Player } from '@/core/types'
 
@@ -11,11 +11,11 @@ export default function LineSelection() {
   const isInjurySub    = useGameStore(s => s.isInjurySub)
   const confirmLine    = useGameStore(s => s.confirmLine)
   const backToGameList = useGameStore(s => s.backToGameList)
+  const { lineRatio }  = useRecordingOptions()
 
   const rosters    = session?.gameConfig.rosters
   const teams      = session?.gameConfig.teams
   const activeLine = session?.activeLine
-  const lineSize   = session?.gameConfig.lineSize ?? 7
 
   const [selA, setSelA] = useState<Player[]>(activeLine?.A ?? [])
   const [selB, setSelB] = useState<Player[]>(activeLine?.B ?? [])
@@ -30,9 +30,22 @@ export default function LineSelection() {
     }
   }
 
-  const canConfirm = selA.length === lineSize && selB.length === lineSize
-  const tooManyA = selA.length > lineSize
-  const tooManyB = selB.length > lineSize
+  const countByGender = (sel: Player[]) => ({
+    M: sel.filter(p => p.gender === 'M').length,
+    F: sel.filter(p => p.gender === 'F').length,
+  })
+  const matchesRatio = (sel: Player[]) => {
+    const c = countByGender(sel)
+    return c.M === lineRatio.M && c.F === lineRatio.F
+  }
+  const overRatio = (sel: Player[]) => {
+    const c = countByGender(sel)
+    return c.M > lineRatio.M || c.F > lineRatio.F
+  }
+
+  const canConfirm = matchesRatio(selA) && matchesRatio(selB)
+  const tooMany    = overRatio(selA) || overRatio(selB)
+  const lineSize   = lineRatio.M + lineRatio.F
 
   return (
     <div className="h-full flex flex-col bg-bg text-content">
@@ -49,11 +62,13 @@ export default function LineSelection() {
             {isInjurySub ? 'INJURY SUBSTITUTION — MID-POINT' : 'LINE SELECTION'}
           </Label>
           <div className="text-sm font-bold">
-            {isInjurySub ? 'Swap one player, then confirm' : `Pick exactly ${lineSize} players per team`}
+            {isInjurySub
+              ? 'Swap one player, then confirm'
+              : `Pick ${lineRatio.M} male-matching and ${lineRatio.F} female-matching per team (${lineSize} total)`}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {(tooManyA || tooManyB) && <Chip color="var(--color-danger)">Too many selected</Chip>}
+          {tooMany && <Chip color="var(--color-danger)">Too many selected</Chip>}
           <Btn variant="primary" size="md" disabled={!canConfirm} onClick={() => confirmLine(selA, selB)}>
             {isInjurySub ? 'Confirm Sub' : 'Confirm Line →'}
           </Btn>
@@ -68,7 +83,8 @@ export default function LineSelection() {
           label={teams.A.name}
           onToggle={p => toggle(p, selA, setSelA)}
           divider
-          lineSize={lineSize}
+          targetM={lineRatio.M}
+          targetF={lineRatio.F}
         />
         <TeamColumn
           players={rosters.B}
@@ -76,7 +92,8 @@ export default function LineSelection() {
           color={teams.B.color}
           label={teams.B.name}
           onToggle={p => toggle(p, selB, setSelB)}
-          lineSize={lineSize}
+          targetM={lineRatio.M}
+          targetF={lineRatio.F}
         />
       </div>
     </div>
@@ -90,18 +107,26 @@ interface TeamColumnProps {
   label: string
   onToggle: (p: Player) => void
   divider?: boolean
-  lineSize?: number
+  targetM: number
+  targetF: number
 }
 
-function TeamColumn({ players, selected, color, label, onToggle, divider, lineSize = 7 }: TeamColumnProps) {
-  const count = selected.length
-  const countColor = count > lineSize ? 'var(--color-danger)' : count === lineSize ? 'var(--color-success)' : count > 0 ? 'var(--color-warn)' : 'var(--color-muted)'
+function TeamColumn({ players, selected, color, label, onToggle, divider, targetM, targetF }: TeamColumnProps) {
+  const countM = selected.filter(p => p.gender === 'M').length
+  const countF = selected.filter(p => p.gender === 'F').length
+
+  const chipColor = (count: number, target: number) =>
+    count > target ? 'var(--color-danger)'
+      : count === target ? 'var(--color-success)'
+      : count > 0 ? 'var(--color-warn)'
+      : 'var(--color-muted)'
 
   return (
     <div className={`flex-1 flex flex-col ${divider ? 'border-r border-border' : ''}`}>
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border flex-shrink-0">
-        <span className="text-sm font-bold" style={{ color }}>{label}</span>
-        <Chip color={countColor}>{count} / {lineSize}</Chip>
+        <span className="text-sm font-bold flex-1" style={{ color }}>{label}</span>
+        <Chip color={chipColor(countM, targetM)}>M {countM}/{targetM}</Chip>
+        <Chip color={chipColor(countF, targetF)}>F {countF}/{targetF}</Chip>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">
@@ -126,10 +151,22 @@ function TeamColumn({ players, selected, color, label, onToggle, divider, lineSi
               >
                 {isOn && '✓'}
               </span>
-              <span className="text-sm" style={{
+              <span
+                className="flex-shrink-0 w-4 text-center text-[10px] font-mono"
+                style={{ color: p.gender === 'F' ? 'var(--color-warn)' : 'var(--color-muted)' }}
+                title={p.gender === 'F' ? 'Female-matching' : 'Male-matching'}
+              >
+                {p.gender}
+              </span>
+              <span className="text-sm flex-1" style={{
                 fontWeight: isOn ? 600 : 400,
                 color: isOn ? 'var(--color-content)' : 'var(--color-muted)',
               }}>
+                {p.jerseyNumber !== undefined && (
+                  <span className="font-mono mr-1.5" style={{ color: 'var(--color-dim)' }}>
+                    #{p.jerseyNumber}
+                  </span>
+                )}
                 {p.name}
               </span>
             </button>

@@ -72,7 +72,7 @@ interface GameStore {
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
-const STORAGE_VERSION = 2
+const STORAGE_VERSION = 3
 const STORAGE_KEY     = 'ust-game'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -81,13 +81,21 @@ function freshSession(gameId: number, pullingTeam: TeamId): GameSession | null {
   const config = MOCK_GAMES.find(g => g.id === gameId)
   if (!config) return null
 
+  // Seed each line with the first 4 male-matching and first 3 female-matching players
+  // (the default 4M/3F ratio). User can adjust on LineSelection.
+  const seed = (roster: Player[]) => {
+    const males   = roster.filter(p => p.gender === 'M').slice(0, 4)
+    const females = roster.filter(p => p.gender === 'F').slice(0, 3)
+    return [...males, ...females]
+  }
+
   return {
     gameConfig:           config,
     gameStartPullingTeam: pullingTeam,
     rawLog:               [],
     activeLine: {
-      A: config.rosters.A.slice(0, 7),
-      B: config.rosters.B.slice(0, 7),
+      A: seed(config.rosters.A),
+      B: seed(config.rosters.B),
     },
   }
 }
@@ -469,11 +477,14 @@ export const useGameStore = create<GameStore>()(
       name:    STORAGE_KEY,
       version: STORAGE_VERSION,
       storage: createJSONStorage(() => localStorage),
-      migrate: (persisted, fromVersion) => {
-        if (fromVersion < 2) {
-          return { ...(persisted as object), recordingOptions: DEFAULT_RECORDING_OPTIONS }
+      migrate: (persisted) => {
+        // Always merge persisted recordingOptions with current defaults so newly-added
+        // option fields (e.g. lineRatio) get sensible values without losing user toggles.
+        const obj = persisted as { recordingOptions?: Partial<RecordingOptions> }
+        return {
+          ...obj,
+          recordingOptions: { ...DEFAULT_RECORDING_OPTIONS, ...(obj.recordingOptions ?? {}) },
         }
-        return persisted
       },
       partialize: (state) => ({
         session:          state.session,

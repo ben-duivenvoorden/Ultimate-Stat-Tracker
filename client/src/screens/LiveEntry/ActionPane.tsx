@@ -2,6 +2,7 @@ import { Label } from '@/components/ui/Label'
 import { Btn } from '@/components/ui/Btn'
 import type { GamePhase, UiMode, RecordingOptions } from '@/core/types'
 import { PICK_MODES, isPickMode, resolveContextLabel, type PickUiMode } from '@/core/pickModes'
+import { deadDiscLabel, type DeadDiscEventType } from '@/core/format'
 import { TerminalPanel, type TerminalPanelProps } from './TerminalPanel'
 
 interface ActionPaneProps {
@@ -12,6 +13,7 @@ interface ActionPaneProps {
   selPullerName: string | null
   defendingShort: string
   recordingOptions: RecordingOptions
+  deadDiscEvent: DeadDiscEventType | null
 
   onRecordPull:        (bonus?: boolean) => void
   onThrowAway:         () => void
@@ -34,7 +36,7 @@ interface ActionPaneProps {
 
 export function ActionPane({
   gamePhase, uiMode, pullerSelected, discHolderName, selPullerName, defendingShort,
-  recordingOptions,
+  recordingOptions, deadDiscEvent,
   onRecordPull, onThrowAway, onReceiverError, onDefensiveBlock, onGoal,
   onHalfTime, onEndGame, onInjurySub, onStall, onFoul, onPick, onTimeout,
   onCancelPickMode,
@@ -49,9 +51,11 @@ export function ActionPane({
   const contextLabel = pickMode
     ? resolveContextLabel(pickMode, { defendingShort })
     : isPullPhase
-      ? selPullerName ? selPullerName.toUpperCase() : 'TAP PULLER FIRST'
+      ? selPullerName ? selPullerName.toUpperCase() : 'SELECT PULLER'
     : discHolderName
       ? `DISC WITH ${discHolderName.toUpperCase()}`
+    : deadDiscEvent
+      ? deadDiscLabel(deadDiscEvent)
       : 'TAP PLAYER FIRST'
 
   const contextColor = pickMode ? PICK_MODES[pickMode].color : 'var(--color-muted)'
@@ -61,9 +65,9 @@ export function ActionPane({
       className="flex-1 flex flex-col"
       style={{ borderLeft: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)' }}
     >
-      {!pickMode && (
+      {!pickMode && !isTerminal && (
         <div
-          className="flex-shrink-0 h-7 flex items-center px-2.5 gap-1.5"
+          className="flex-shrink-0 h-7 flex items-center justify-center px-2.5"
           style={{ borderBottom: '1px solid var(--color-border)' }}
         >
           <Label className="text-[9px] truncate" color={contextColor}>{contextLabel}</Label>

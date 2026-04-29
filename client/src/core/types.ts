@@ -20,6 +20,8 @@ export interface Player {
   id: PlayerId
   name: string
   teamId: TeamId
+  /** Matching division: 'M' = male-matching, 'F' = female-matching (mixed-division ultimate). */
+  gender: 'M' | 'F'
   jerseyNumber?: number
   photoUrl?: string
 }
@@ -135,6 +137,8 @@ export interface RecordingOptions {
   foul:      boolean
   pick:      boolean
   stall:     boolean
+  /** Mixed-division line composition: M = male-matching, F = female-matching. */
+  lineRatio: { M: number; F: number }
 }
 
 export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
@@ -142,6 +146,7 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
   foul:      false,
   pick:      false,
   stall:     false,
+  lineRatio: { M: 4, F: 3 },
 }
 
 // ─── Game config & session ────────────────────────────────────────────────────
