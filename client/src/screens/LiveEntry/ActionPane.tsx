@@ -42,7 +42,7 @@ export function ActionPane({
   terminalProps,
 }: ActionPaneProps) {
   const isTerminal = gamePhase === 'point-over' || gamePhase === 'half-time' || gamePhase === 'game-over'
-  const isPickMode = uiMode === 'block-pick' || uiMode === 'intercept-pick' || uiMode === 'injury-pick'
+  const isPickMode = uiMode === 'block-pick' || uiMode === 'intercept-pick' || uiMode === 'receiver-error-pick' || uiMode === 'injury-pick'
   const isPullPhase = gamePhase === 'awaiting-pull'
   const armed = gamePhase === 'in-play' && discHolderName !== null && !isPickMode
 

@@ -35,7 +35,7 @@ export default function LiveEntry() {
 
   const playerMode: PlayerPaneMode =
     ui.uiMode === 'injury-pick'        ? 'injury' :
-    ui.uiMode === 'receiver-error-pick' ? 'normal' :
+    ui.uiMode === 'receiver-error-pick' ? 'receiver-error' :
     ui.uiMode === 'intercept-pick'     ? 'intercept' :
     ui.uiMode === 'block-pick'         ? 'block' :
     isPullPhase                        ? 'pull' :

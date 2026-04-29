@@ -1,7 +1,7 @@
 import type { Player } from '@/core/types'
 import { Label } from '@/components/ui/Label'
 
-export type PlayerPaneMode = 'normal' | 'pull' | 'block' | 'intercept' | 'injury'
+export type PlayerPaneMode = 'normal' | 'pull' | 'block' | 'intercept' | 'receiver-error' | 'injury'
 
 interface PlayerPaneProps {
   players: Player[]
@@ -23,11 +23,12 @@ interface PlayerPaneProps {
 }
 
 const modeMeta = {
-  normal:    { bg: 'var(--color-bg)',           label: 'POSSESSION',       accent: null },
-  pull:      { bg: 'var(--color-bg)',           label: 'PULLING',          accent: null },
-  block:     { bg: 'var(--color-block-bg)',     label: 'PICK BLOCKER',     accent: 'var(--color-block)' },
-  intercept: { bg: 'var(--color-intercept-bg)', label: 'PICK INTERCEPTOR', accent: 'var(--color-intercept)' },
-  injury:    { bg: 'var(--color-injury-bg)',   label: 'PICK INJURED',     accent: 'var(--color-warn)' },
+  normal:          { bg: 'var(--color-bg)',           label: 'POSSESSION',       accent: null },
+  pull:            { bg: 'var(--color-bg)',           label: 'PULLING',          accent: null },
+  block:           { bg: 'var(--color-block-bg)',     label: 'PICK BLOCKER',     accent: 'var(--color-block)' },
+  intercept:       { bg: 'var(--color-intercept-bg)', label: 'PICK INTERCEPTOR', accent: 'var(--color-intercept)' },
+  'receiver-error': { bg: 'var(--color-warn-bg)',     label: 'PICK PLAYER',      accent: 'var(--color-warn)' },
+  injury:          { bg: 'var(--color-injury-bg)',   label: 'PICK INJURED',     accent: 'var(--color-warn)' },
 } as const
 
 export function PlayerPane({
