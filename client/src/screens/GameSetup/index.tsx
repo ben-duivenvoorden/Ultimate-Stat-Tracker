@@ -19,7 +19,9 @@ export default function GameSetup() {
   const game = selectedId ? MOCK_GAMES.find(g => g.id === selectedId) : null
   const hasSession = !!(game && session && session.gameConfig.id === game.id && session.rawLog.length > 0)
   const isFinished = !!(hasSession && session?.rawLog.some(e => e.type === 'end-game'))
-  const canResume = hasSession && !isFinished
+  const isInProgressConfig = game?.status === 'in-progress'
+  const canResume = (hasSession || isInProgressConfig) && !isFinished
+  const skipPullPrompt = hasSession || isInProgressConfig
 
   return (
     <div className="h-full flex bg-bg text-content">
@@ -102,9 +104,10 @@ export default function GameSetup() {
             </div>
 
             {/* Who pulls first — only when starting fresh */}
-            {!hasSession && (
+            {!skipPullPrompt && (
               <div className="w-full max-w-sm">
-                <Label block className="text-center mb-3">WHO PULLS FIRST?</Label>
+                <div className="text-center text-sm text-content mb-0.5">Who will pull first?</div>
+                <div className="text-center text-xs italic mb-3" style={{ color: 'var(--color-muted)' }}>(Who is on Defence?)</div>
                 <div className="flex gap-3">
                   {(['A', 'B'] as TeamId[]).map(t => {
                     const team = game.teams[t]
@@ -139,7 +142,11 @@ export default function GameSetup() {
                 </>
               ) : canResume ? (
                 <>
-                  <Btn variant="primary" size="lg" onClick={() => resumeGame(game.id)}>
+                  <Btn
+                    variant="primary"
+                    size="lg"
+                    onClick={() => hasSession ? resumeGame(game.id) : selectGame(game.id, 'A')}
+                  >
                     ▶  Continue Recording
                   </Btn>
                   <Btn variant="ghost" size="lg">Export</Btn>
