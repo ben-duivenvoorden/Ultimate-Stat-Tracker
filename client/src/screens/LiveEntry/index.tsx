@@ -21,7 +21,7 @@ export default function LiveEntry() {
   const { teams } = session.gameConfig
   const { gameStartPullingTeam } = session
 
-  const isPickMode  = ui.uiMode === 'block-pick' || ui.uiMode === 'intercept-pick' || ui.uiMode === 'injury-pick'
+  const isPickMode  = ui.uiMode === 'block-pick' || ui.uiMode === 'intercept-pick' || ui.uiMode === 'receiver-error-pick' || ui.uiMode === 'injury-pick'
   const isPullPhase = state.gamePhase === 'awaiting-pull'
   const isTerminal  = state.gamePhase === 'point-over' || state.gamePhase === 'half-time' || state.gamePhase === 'game-over'
 
@@ -34,10 +34,11 @@ export default function LiveEntry() {
   }
 
   const playerMode: PlayerPaneMode =
-    ui.uiMode === 'injury-pick'     ? 'injury' :
-    ui.uiMode === 'intercept-pick'  ? 'intercept' :
-    ui.uiMode === 'block-pick'      ? 'block' :
-    isPullPhase                     ? 'pull' :
+    ui.uiMode === 'injury-pick'        ? 'injury' :
+    ui.uiMode === 'receiver-error-pick' ? 'normal' :
+    ui.uiMode === 'intercept-pick'     ? 'intercept' :
+    ui.uiMode === 'block-pick'         ? 'block' :
+    isPullPhase                        ? 'pull' :
     'normal'
 
   const allPlayers     = [...session.gameConfig.rosters.A, ...session.gameConfig.rosters.B]

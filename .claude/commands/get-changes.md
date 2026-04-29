@@ -12,4 +12,4 @@ disable-model-invocation: true
 
 4. /commit any existing changes to the current branch
 
-5. Implement everything described. Work through all items before reporting back.
+5. Echo the changes in chat and implement everything described. Work through all items before reporting back.
