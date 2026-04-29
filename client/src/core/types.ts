@@ -1,9 +1,11 @@
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
 export type TeamId   = 'A' | 'B'
-export type PlayerId = string
+/** Per-game surrogate (auto-assigned when a session is created from a roster). */
+export type PlayerId = number
 export type GameId   = number
-export type EventId  = string
+/** Per-game monotonic event id (1, 2, 3 …). Append-only — never reused. */
+export type EventId  = number
 
 export const otherTeam = (t: TeamId): TeamId => (t === 'A' ? 'B' : 'A')
 
@@ -47,6 +49,7 @@ export type RawEventType =
   | 'timeout'
   | 'goal'
   | 'injury-sub'
+  | 'reorder-line'             // visual reorder of a team's on-field line (no roster change)
   | 'half-time'
   | 'end-game'
   | 'foul'
@@ -61,13 +64,18 @@ interface BaseRawEvent {
   pointIndex: number
 }
 
-export interface PointStartRawEvent extends BaseRawEvent { type: 'point-start' }
+// Point-start carries the agreed line-up for both teams. Engine reconstructs
+// activeLine on derivation; the line is no longer stored on the session.
+export interface PointStartRawEvent extends BaseRawEvent { type: 'point-start'; lineA: PlayerId[]; lineB: PlayerId[] }
 export interface PullRawEvent       extends BaseRawEvent { type: 'pull' | 'pull-bonus'; playerId: PlayerId; teamId: TeamId }
 export interface PossessionRawEvent extends BaseRawEvent { type: 'possession';          playerId: PlayerId; teamId: TeamId }
 export interface TurnoverRawEvent   extends BaseRawEvent { type: 'turnover-throw-away' | 'turnover-receiver-error' | 'turnover-stall'; playerId: PlayerId; teamId: TeamId }
 export interface BlockRawEvent      extends BaseRawEvent { type: 'block' | 'intercept'; playerId: PlayerId; teamId: TeamId }
 export interface GoalRawEvent       extends BaseRawEvent { type: 'goal';                playerId: PlayerId; teamId: TeamId }
-export interface InjurySubRawEvent  extends BaseRawEvent { type: 'injury-sub';          outPlayerId: PlayerId; inPlayerId: PlayerId; teamId: TeamId }
+// Injury sub replaces a single team's line with a new ordered list.
+export interface InjurySubRawEvent  extends BaseRawEvent { type: 'injury-sub'; teamId: TeamId; line: PlayerId[] }
+// Visual reorder — same set of players, new display order.
+export interface LineReorderRawEvent extends BaseRawEvent { type: 'reorder-line'; teamId: TeamId; line: PlayerId[] }
 export interface HalfTimeRawEvent   extends BaseRawEvent { type: 'half-time' }
 export interface EndGameRawEvent    extends BaseRawEvent { type: 'end-game' }
 export interface TimeoutRawEvent    extends BaseRawEvent { type: 'timeout' }
@@ -85,6 +93,7 @@ export type RawEvent =
   | BlockRawEvent
   | GoalRawEvent
   | InjurySubRawEvent
+  | LineReorderRawEvent
   | HalfTimeRawEvent
   | EndGameRawEvent
   | TimeoutRawEvent
@@ -95,10 +104,11 @@ export type RawEvent =
   | AmendRawEvent
 
 // ─── Visual log ───────────────────────────────────────────────────────────────
-// Same shape as RawEvent minus undo/amend (those resolve into the visible list).
+// Same shape as RawEvent minus structural-only entries (undo/amend resolve into
+// the visible list; reorder-line is purely a display directive).
 // Structured — no formatted strings. UI layer formats via format.ts.
 
-export type VisLogEntry = Exclude<RawEvent, UndoRawEvent | AmendRawEvent>
+export type VisLogEntry = Exclude<RawEvent, UndoRawEvent | AmendRawEvent | LineReorderRawEvent>
 
 // ─── Derived game state ───────────────────────────────────────────────────────
 
@@ -113,10 +123,13 @@ export type GamePhase =
 export interface DerivedGameState {
   gamePhase: GamePhase
   score: Score
-  possession: TeamId          // team currently entitled to disc (or about to receive)
-  attackLeft: TeamId          // team currently attacking left → right (UI orientation)
-  discHolder: PlayerId | null // null between possession events / turnovers
-  pointIndex: number          // total goals scored so far
+  possession: TeamId           // team currently entitled to disc (or about to receive)
+  attackLeft: TeamId           // team currently attacking left → right (UI orientation)
+  discHolder: PlayerId | null  // null between possession events / turnovers
+  pointIndex: number           // total goals scored so far
+  /** Players on the field for each team, in display order. Derived from
+   *  point-start / injury-sub / reorder-line events. */
+  activeLine: ActiveLine
 }
 
 // ─── Transient UI state (lives in store, not derived) ─────────────────────────
@@ -126,7 +139,6 @@ export type UiMode =
   | 'block-pick'         // recorder tapped "Blocked by Defence", picking blocker
   | 'intercept-pick'     // recorder tapped "Intercepted by Defence", picking interceptor
   | 'receiver-error-pick' // recorder tapped "Receiver Error", picking player who had error
-  | 'injury-pick'        // recorder tapped "Injury Sub", picking injured player
 
 export type AppScreen = 'game-setup' | 'game-settings' | 'line-selection' | 'live-entry'
 
@@ -173,9 +185,10 @@ export interface ActiveLine {
   B: Player[]
 }
 
+// activeLine is no longer stored — it's reconstructed from rawLog by the engine.
+// Anything that needs the line reads it from `DerivedGameState.activeLine`.
 export interface GameSession {
   gameConfig: GameConfig
   gameStartPullingTeam: TeamId
   rawLog: RawEvent[]
-  activeLine: ActiveLine
 }

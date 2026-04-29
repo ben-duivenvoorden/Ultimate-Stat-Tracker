@@ -1,6 +1,6 @@
 import { useSession, useDerivedState, useVisLog, useGameActions, useUiState, useRecordingOptions } from '@/core/selectors'
 import { useGameStore } from '@/core/store'
-import { otherTeam } from '@/core/types'
+import { otherTeam, type PlayerId } from '@/core/types'
 import { isPickMode, pickActiveTeam } from '@/core/pickModes'
 import { lastDeadDiscEvent } from '@/core/format'
 import { PlayerPane, type PlayerPaneMode } from './PlayerPane'
@@ -36,7 +36,8 @@ export default function LiveEntry() {
   const playerMode: PlayerPaneMode = pickMode ?? (isPullPhase ? 'pull' : 'normal')
 
   const allPlayers     = [...session.gameConfig.rosters.A, ...session.gameConfig.rosters.B]
-  const lookupName     = (id: string | null) => id ? (allPlayers.find(p => p.id === id)?.name ?? id) : null
+  const lookupName     = (id: PlayerId | null): string | null =>
+    id !== null ? (allPlayers.find(p => p.id === id)?.name ?? String(id)) : null
   const discHolderName = lookupName(state.discHolder)
   const selPullerName  = lookupName(ui.selPuller)
   const goalScorerName = isTerminal
@@ -56,11 +57,17 @@ export default function LiveEntry() {
     onBackToGames:        actions.backToGameList,
   }
 
-  // Action pane is the sliding overlay — it always covers the inactive team.
-  // Layout columns: [Team A | Team B | Log]
-  //   Team A active → action covers Team B (centre) → translateX(100%)
-  //   Team B active → action covers Team A (left)   → translateX(0%)
-  const actionTranslateX = activeTeam === 'A' ? '100%' : '0%'
+  // Layout: [team-on-left-pane | team-on-centre-pane | Log].
+  // swapSides flips which physical side each team is on (used when teams
+  // change ends or the scorer walks around the field).
+  const swapSides   = useGameStore(s => s.swapSides)
+  const toggleSwap  = useGameStore(s => s.toggleSwapSides)
+  const teamLeft    = swapSides ? 'B' : 'A'
+  const teamCentre  = swapSides ? 'A' : 'B'
+
+  // Action pane covers the *inactive* team. translateX(0%) sits over the left
+  // pane; translateX(100%) shifts to the centre pane.
+  const actionTranslateX = activeTeam === teamLeft ? '100%' : '0%'
 
   const sharedPlayerPaneProps = {
     discHolderId: state.discHolder,
@@ -83,42 +90,48 @@ export default function LiveEntry() {
           ←
         </button>
         <div className="flex-1 flex items-center justify-center gap-3">
-          <span className="text-sm font-bold" style={{ color: teams.A.color }}>{teams.A.short}</span>
-          <strong className="text-3xl font-black tabular-nums leading-none text-content">{state.score.A}</strong>
+          <span className="text-sm font-bold" style={{ color: teams[teamLeft].color }}>{teams[teamLeft].short}</span>
+          <strong className="text-3xl font-black tabular-nums leading-none text-content">{state.score[teamLeft]}</strong>
           <span className="text-dim text-base">–</span>
-          <strong className="text-3xl font-black tabular-nums leading-none text-content">{state.score.B}</strong>
-          <span className="text-sm font-bold" style={{ color: teams.B.color }}>{teams.B.short}</span>
+          <strong className="text-3xl font-black tabular-nums leading-none text-content">{state.score[teamCentre]}</strong>
+          <span className="text-sm font-bold" style={{ color: teams[teamCentre].color }}>{teams[teamCentre].short}</span>
         </div>
-        <div className="w-5" />
+        <button
+          onClick={toggleSwap}
+          className="text-muted hover:text-content transition-colors cursor-pointer text-base leading-none px-1"
+          title="Swap team sides"
+        >
+          ⇆
+        </button>
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">
 
-        {/* Pane 1: Team A — always left */}
+        {/* Pane 1: left side */}
         <div style={{ flex: 1, display: 'flex' }}>
           {!isTerminal && (
             <PlayerPane
               {...sharedPlayerPaneProps}
-              players={session.activeLine.A}
-              teamColor={teams.A.color}
-              teamShort={teams.A.short}
-              mode={activeTeam === 'A' ? playerMode : 'normal'}
-              onReorder={(f, t) => actions.reorderActiveLine('A', f, t)}
+              players={state.activeLine[teamLeft]}
+              teamColor={teams[teamLeft].color}
+              teamShort={teams[teamLeft].short}
+              mode={activeTeam === teamLeft ? playerMode : 'normal'}
+              onReorder={(f, t) => actions.reorderActiveLine(teamLeft, f, t)}
             />
           )}
         </div>
 
-        {/* Pane 2: Team B — always centre, right-aligned */}
+        {/* Pane 2: centre, right-aligned (mirrored layout) */}
         <div style={{ flex: 1, display: 'flex' }}>
           {!isTerminal && (
             <PlayerPane
               {...sharedPlayerPaneProps}
-              players={session.activeLine.B}
-              teamColor={teams.B.color}
-              teamShort={teams.B.short}
-              mode={activeTeam === 'B' ? playerMode : 'normal'}
+              players={state.activeLine[teamCentre]}
+              teamColor={teams[teamCentre].color}
+              teamShort={teams[teamCentre].short}
+              mode={activeTeam === teamCentre ? playerMode : 'normal'}
               align="right"
-              onReorder={(f, t) => actions.reorderActiveLine('B', f, t)}
+              onReorder={(f, t) => actions.reorderActiveLine(teamCentre, f, t)}
             />
           )}
         </div>

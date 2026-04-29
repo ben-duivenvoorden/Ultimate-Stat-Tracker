@@ -1,13 +1,14 @@
-import type { RawEventType, AppScreen, TeamId, UiMode } from './types'
+import type { RawEventType, TeamId, UiMode } from './types'
 import { otherTeam } from './types'
 
 // ─── Pick-mode registry ───────────────────────────────────────────────────────
 // Single source of truth for "tap a player to resolve a pending action" flows.
 // Adding a new pick mode = one entry here + one entry in UiMode in types.ts.
 
-export type PickTapAction =
-  | { kind: 'record'; eventType: RawEventType; team: 'possession' | 'defending' }
-  | { kind: 'navigate'; screen: AppScreen; setIsInjurySub?: boolean }
+export interface PickTapAction {
+  eventType: RawEventType
+  team: 'possession' | 'defending'
+}
 
 export interface PickModeConfig {
   /** Short label for the PlayerPane header (e.g. "PICK BLOCKER"). */
@@ -31,7 +32,7 @@ export const PICK_MODES = {
     displayName:  'Blocked by Defence',
     color:        'var(--color-block)',
     bgColor:      'var(--color-block-bg)',
-    onTap:        { kind: 'record', eventType: 'block', team: 'defending' },
+    onTap:        { eventType: 'block', team: 'defending' },
   },
   'intercept-pick': {
     paneLabel:    'PICK INTERCEPTOR',
@@ -39,7 +40,7 @@ export const PICK_MODES = {
     displayName:  'Intercepted by Defence',
     color:        'var(--color-intercept)',
     bgColor:      'var(--color-intercept-bg)',
-    onTap:        { kind: 'record', eventType: 'intercept', team: 'defending' },
+    onTap:        { eventType: 'intercept', team: 'defending' },
   },
   'receiver-error-pick': {
     paneLabel:    'PICK PLAYER',
@@ -47,15 +48,7 @@ export const PICK_MODES = {
     displayName:  'Receiver Error',
     color:        'var(--color-warn)',
     bgColor:      'var(--color-warn-bg)',
-    onTap:        { kind: 'record', eventType: 'turnover-receiver-error', team: 'possession' },
-  },
-  'injury-pick': {
-    paneLabel:    'PICK INJURED',
-    contextLabel: 'TAP INJURED PLAYER',
-    displayName:  'Injury Sub',
-    color:        'var(--color-warn)',
-    bgColor:      'var(--color-injury-bg)',
-    onTap:        { kind: 'navigate', screen: 'line-selection', setIsInjurySub: true },
+    onTap:        { eventType: 'turnover-receiver-error', team: 'possession' },
   },
 } as const satisfies Record<Exclude<UiMode, 'idle'>, PickModeConfig>
 
@@ -67,11 +60,7 @@ export function isPickMode(m: UiMode): m is PickUiMode {
 
 /** Which team's players should be active (tappable) during this pick mode? */
 export function pickActiveTeam(mode: PickUiMode, possession: TeamId): TeamId {
-  const cfg = PICK_MODES[mode]
-  if (cfg.onTap.kind === 'record' && cfg.onTap.team === 'defending') {
-    return otherTeam(possession)
-  }
-  return possession
+  return PICK_MODES[mode].onTap.team === 'defending' ? otherTeam(possession) : possession
 }
 
 /** Resolve the contextLabel for an ActionPane render. */

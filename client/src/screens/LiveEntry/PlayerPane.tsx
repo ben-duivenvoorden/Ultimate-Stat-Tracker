@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { Player } from '@/core/types'
+import type { Player, PlayerId } from '@/core/types'
 import { PICK_MODES, type PickUiMode } from '@/core/pickModes'
 import { Label } from '@/components/ui/Label'
 
@@ -11,8 +11,8 @@ interface PlayerPaneProps {
   teamShort: string
 
   mode: PlayerPaneMode
-  discHolderId: string | null
-  selPullerId: string | null
+  discHolderId: PlayerId | null
+  selPullerId: PlayerId | null
   align?: 'right'
 
   onTap: (player: Player) => void

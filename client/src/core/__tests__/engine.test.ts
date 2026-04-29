@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeVisLog, deriveGameState, canRecord, appendEvents, baseRawEvent } from '../engine'
+import { computeVisLog, deriveGameState, canRecord, appendEvents } from '../engine'
 import type { GameSession, RawEvent } from '../types'
 import { MOCK_GAMES } from '../data'
 
@@ -11,15 +11,20 @@ function makeSession(pullingTeam: 'A' | 'B' = 'A'): GameSession {
     gameConfig:           config,
     gameStartPullingTeam: pullingTeam,
     rawLog:               [],
-    activeLine: {
-      A: config.rosters.A.slice(0, 7),
-      B: config.rosters.B.slice(0, 7),
-    },
   }
 }
 
+// Common short-hand for tests: a point-start with two seven-player lines pulled
+// from the first MOCK_GAMES roster.
+const ROSTER_A = MOCK_GAMES[0].rosters.A
+const ROSTER_B = MOCK_GAMES[0].rosters.B
+const LINE_A_IDS = ROSTER_A.slice(0, 7).map(p => p.id)
+const LINE_B_IDS = ROSTER_B.slice(0, 7).map(p => p.id)
+const startPoint = (pointIndex = 0) =>
+  ({ pointIndex, type: 'point-start', lineA: LINE_A_IDS, lineB: LINE_B_IDS } as const)
+
 let counter = 0
-function id() { return `e${++counter}` }
+function id() { return ++counter }
 
 function ev(partial: Omit<RawEvent, 'id' | 'timestamp'> & { pointIndex?: number }): RawEvent {
   return { id: id(), timestamp: 0, pointIndex: 0, ...partial } as RawEvent
@@ -34,17 +39,17 @@ describe('computeVisLog', () => {
 
   it('passes through normal events', () => {
     const events: RawEvent[] = [
-      ev({ type: 'point-start' }),
-      ev({ type: 'pull', playerId: 'a1', teamId: 'A' }),
+      ev({ type: 'point-start', lineA: LINE_A_IDS, lineB: LINE_B_IDS }),
+      ev({ type: 'pull', playerId: 1, teamId: 'A' }),
     ]
     expect(computeVisLog(events)).toHaveLength(2)
   })
 
   it('undo removes the most recent visible non-system event', () => {
     const events: RawEvent[] = [
-      ev({ type: 'point-start' }),
-      ev({ type: 'pull', playerId: 'a1', teamId: 'A' }),
-      ev({ type: 'possession', playerId: 'b1', teamId: 'B' }),
+      ev({ type: 'point-start', lineA: LINE_A_IDS, lineB: LINE_B_IDS }),
+      ev({ type: 'pull', playerId: 1, teamId: 'A' }),
+      ev({ type: 'possession', playerId: 14, teamId: 'B' }),
       ev({ type: 'undo' }),
     ]
     const vis = computeVisLog(events)
@@ -54,7 +59,7 @@ describe('computeVisLog', () => {
 
   it('undo skips structural entries (point-start, half-time, end-game)', () => {
     const events: RawEvent[] = [
-      ev({ type: 'point-start' }),
+      ev({ type: 'point-start', lineA: LINE_A_IDS, lineB: LINE_B_IDS }),
       ev({ type: 'undo' }),
     ]
     // point-start is structural, undo finds nothing else, leaves it alone
@@ -64,10 +69,10 @@ describe('computeVisLog', () => {
 
   it('multiple undos pop sequentially', () => {
     const events: RawEvent[] = [
-      ev({ type: 'point-start' }),
-      ev({ type: 'pull', playerId: 'a1', teamId: 'A' }),
-      ev({ type: 'possession', playerId: 'b1', teamId: 'B' }),
-      ev({ type: 'possession', playerId: 'b2', teamId: 'B' }),
+      ev({ type: 'point-start', lineA: LINE_A_IDS, lineB: LINE_B_IDS }),
+      ev({ type: 'pull', playerId: 1, teamId: 'A' }),
+      ev({ type: 'possession', playerId: 14, teamId: 'B' }),
+      ev({ type: 'possession', playerId: 15, teamId: 'B' }),
       ev({ type: 'undo' }),
       ev({ type: 'undo' }),
     ]
@@ -91,15 +96,15 @@ describe('deriveGameState', () => {
 
   it('after point-start: awaiting-pull', () => {
     let session = makeSession('A')
-    session = appendEvents(session, [{ ...baseRawEvent(0), type: 'point-start' }])
+    session = appendEvents(session, [startPoint(0)])
     expect(deriveGameState(session).gamePhase).toBe('awaiting-pull')
   })
 
   it('after pull: in-play', () => {
     let session = makeSession('A')
     session = appendEvents(session, [
-      { ...baseRawEvent(0), type: 'point-start' },
-      { ...baseRawEvent(0), type: 'pull', playerId: 'a1', teamId: 'A' },
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
     ])
     expect(deriveGameState(session).gamePhase).toBe('in-play')
   })
@@ -107,22 +112,22 @@ describe('deriveGameState', () => {
   it('possession event sets discHolder', () => {
     let session = makeSession('A')
     session = appendEvents(session, [
-      { ...baseRawEvent(0), type: 'point-start' },
-      { ...baseRawEvent(0), type: 'pull', playerId: 'a1', teamId: 'A' },
-      { ...baseRawEvent(0), type: 'possession', playerId: 'b1', teamId: 'B' },
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' },
     ])
     const state = deriveGameState(session)
-    expect(state.discHolder).toBe('b1')
+    expect(state.discHolder).toBe(14)
     expect(state.possession).toBe('B')
   })
 
   it('turnover flips possession and clears discHolder', () => {
     let session = makeSession('A')
     session = appendEvents(session, [
-      { ...baseRawEvent(0), type: 'point-start' },
-      { ...baseRawEvent(0), type: 'pull', playerId: 'a1', teamId: 'A' },
-      { ...baseRawEvent(0), type: 'possession', playerId: 'b1', teamId: 'B' },
-      { ...baseRawEvent(0), type: 'turnover-throw-away', playerId: 'b1', teamId: 'B' },
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' },
+      { pointIndex: 0, type: 'turnover-throw-away', playerId: 14, teamId: 'B' },
     ])
     const state = deriveGameState(session)
     expect(state.possession).toBe('A')
@@ -132,10 +137,10 @@ describe('deriveGameState', () => {
   it('block sets possession to defending team', () => {
     let session = makeSession('A')
     session = appendEvents(session, [
-      { ...baseRawEvent(0), type: 'point-start' },
-      { ...baseRawEvent(0), type: 'pull', playerId: 'a1', teamId: 'A' },
-      { ...baseRawEvent(0), type: 'possession', playerId: 'b1', teamId: 'B' },
-      { ...baseRawEvent(0), type: 'block', playerId: 'a3', teamId: 'A' },
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' },
+      { pointIndex: 0, type: 'block', playerId: 3, teamId: 'A' },
     ])
     const state = deriveGameState(session)
     expect(state.possession).toBe('A')
@@ -145,10 +150,10 @@ describe('deriveGameState', () => {
   it('goal increments score, transitions to point-over, sets up next point', () => {
     let session = makeSession('A')
     session = appendEvents(session, [
-      { ...baseRawEvent(0), type: 'point-start' },
-      { ...baseRawEvent(0), type: 'pull', playerId: 'a1', teamId: 'A' },
-      { ...baseRawEvent(0), type: 'possession', playerId: 'b1', teamId: 'B' },
-      { ...baseRawEvent(0), type: 'goal', playerId: 'b1', teamId: 'B' },
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' },
+      { pointIndex: 0, type: 'goal', playerId: 14, teamId: 'B' },
     ])
     const state = deriveGameState(session)
     expect(state.score).toEqual({ A: 0, B: 1 })
@@ -163,9 +168,9 @@ describe('deriveGameState', () => {
     let session = makeSession('A')
     // Simulate 8 goals (assume halfTimeAt is 8 from MOCK_GAMES)
     session = appendEvents(session, [
-      { ...baseRawEvent(0), type: 'point-start' },
-      { ...baseRawEvent(0), type: 'goal', playerId: 'b1', teamId: 'B' },
-      { ...baseRawEvent(1), type: 'half-time' },
+      startPoint(0),
+      { pointIndex: 0, type: 'goal', playerId: 14, teamId: 'B' },
+      { pointIndex: 1, type: 'half-time' },
     ])
     const state = deriveGameState(session)
     expect(state.gamePhase).toBe('half-time')
@@ -176,9 +181,9 @@ describe('deriveGameState', () => {
   it('end-game makes phase game-over', () => {
     let session = makeSession('A')
     session = appendEvents(session, [
-      { ...baseRawEvent(0), type: 'point-start' },
-      { ...baseRawEvent(0), type: 'goal', playerId: 'b1', teamId: 'B' },
-      { ...baseRawEvent(1), type: 'end-game' },
+      startPoint(0),
+      { pointIndex: 0, type: 'goal', playerId: 14, teamId: 'B' },
+      { pointIndex: 1, type: 'end-game' },
     ])
     const state = deriveGameState(session)
     expect(state.gamePhase).toBe('game-over')
@@ -187,17 +192,29 @@ describe('deriveGameState', () => {
   it('undo reverses a goal correctly', () => {
     let session = makeSession('A')
     session = appendEvents(session, [
-      { ...baseRawEvent(0), type: 'point-start' },
-      { ...baseRawEvent(0), type: 'pull', playerId: 'a1', teamId: 'A' },
-      { ...baseRawEvent(0), type: 'possession', playerId: 'b1', teamId: 'B' },
-      { ...baseRawEvent(0), type: 'goal', playerId: 'b1', teamId: 'B' },
-      { ...baseRawEvent(0), type: 'undo' },
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' },
+      { pointIndex: 0, type: 'goal', playerId: 14, teamId: 'B' },
+      { pointIndex: 0, type: 'undo' },
     ])
     const state = deriveGameState(session)
     expect(state.score).toEqual({ A: 0, B: 0 })
     expect(state.gamePhase).toBe('in-play')
     expect(state.possession).toBe('B')
-    expect(state.discHolder).toBe('b1')
+    expect(state.discHolder).toBe(14)
+  })
+
+  it('event ids are monotonic and assigned by appendEvents', () => {
+    let session = makeSession('A')
+    session = appendEvents(session, [
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
+    ])
+    expect(session.rawLog[0].id).toBe(1)
+    expect(session.rawLog[1].id).toBe(2)
+    session = appendEvents(session, [{ pointIndex: 0, type: 'undo' }])
+    expect(session.rawLog[2].id).toBe(3)
   })
 })
 
@@ -207,8 +224,8 @@ describe('canRecord', () => {
   it('blocks pull when not in awaiting-pull phase', () => {
     let session = makeSession('A')
     session = appendEvents(session, [
-      { ...baseRawEvent(0), type: 'point-start' },
-      { ...baseRawEvent(0), type: 'pull', playerId: 'a1', teamId: 'A' },
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
     ])
     const state = deriveGameState(session)
     expect(canRecord(state, 'pull')).toBe(false)
@@ -216,7 +233,7 @@ describe('canRecord', () => {
 
   it('allows pull in awaiting-pull phase', () => {
     let session = makeSession('A')
-    session = appendEvents(session, [{ ...baseRawEvent(0), type: 'point-start' }])
+    session = appendEvents(session, [startPoint(0)])
     const state = deriveGameState(session)
     expect(canRecord(state, 'pull')).toBe(true)
   })
@@ -224,8 +241,8 @@ describe('canRecord', () => {
   it('blocks goal when no disc holder', () => {
     let session = makeSession('A')
     session = appendEvents(session, [
-      { ...baseRawEvent(0), type: 'point-start' },
-      { ...baseRawEvent(0), type: 'pull', playerId: 'a1', teamId: 'A' },
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
     ])
     const state = deriveGameState(session)
     expect(canRecord(state, 'goal')).toBe(false)
@@ -234,9 +251,9 @@ describe('canRecord', () => {
   it('allows goal when disc holder is set in-play', () => {
     let session = makeSession('A')
     session = appendEvents(session, [
-      { ...baseRawEvent(0), type: 'point-start' },
-      { ...baseRawEvent(0), type: 'pull', playerId: 'a1', teamId: 'A' },
-      { ...baseRawEvent(0), type: 'possession', playerId: 'b1', teamId: 'B' },
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' },
     ])
     const state = deriveGameState(session)
     expect(canRecord(state, 'goal')).toBe(true)
@@ -245,9 +262,9 @@ describe('canRecord', () => {
   it('blocks new events after end-game', () => {
     let session = makeSession('A')
     session = appendEvents(session, [
-      { ...baseRawEvent(0), type: 'point-start' },
-      { ...baseRawEvent(0), type: 'goal', playerId: 'b1', teamId: 'B' },
-      { ...baseRawEvent(1), type: 'end-game' },
+      startPoint(0),
+      { pointIndex: 0, type: 'goal', playerId: 14, teamId: 'B' },
+      { pointIndex: 1, type: 'end-game' },
     ])
     const state = deriveGameState(session)
     expect(canRecord(state, 'pull')).toBe(false)

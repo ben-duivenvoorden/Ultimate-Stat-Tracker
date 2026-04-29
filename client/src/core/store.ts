@@ -7,7 +7,6 @@ import type {
   PlayerId,
   Player,
   GameSession,
-  RawEvent,
   RecordingOptions,
 } from './types'
 import { otherTeam, DEFAULT_RECORDING_OPTIONS } from './types'
@@ -15,7 +14,7 @@ import {
   deriveGameState,
   canRecord,
   appendEvents,
-  baseRawEvent,
+  type RawEventInput,
 } from './engine'
 import { PICK_MODES, isPickMode } from './pickModes'
 import { MOCK_GAMES } from './data'
@@ -32,6 +31,9 @@ interface GameStore {
   uiMode: UiMode
   selPuller: PlayerId | null
   recordingOptions: RecordingOptions
+  /** When true, Team A and Team B render on opposite sides of the screen.
+   *  Per-device display preference — never goes on the wire. */
+  swapSides: boolean
 
   // Transient (not persisted)
   showEventMenu: boolean
@@ -68,11 +70,12 @@ interface GameStore {
 
   // Pure UI
   setShowEventMenu:  (show: boolean) => void
+  toggleSwapSides:   () => void
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
-const STORAGE_VERSION = 3
+const STORAGE_VERSION = 5
 const STORAGE_KEY     = 'ust-game'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -80,24 +83,26 @@ const STORAGE_KEY     = 'ust-game'
 function freshSession(gameId: number, pullingTeam: TeamId): GameSession | null {
   const config = MOCK_GAMES.find(g => g.id === gameId)
   if (!config) return null
-
-  // Seed each line with the first 4 male-matching and first 3 female-matching players
-  // (the default 4M/3F ratio). User can adjust on LineSelection.
-  const seed = (roster: Player[]) => {
-    const males   = roster.filter(p => p.gender === 'M').slice(0, 4)
-    const females = roster.filter(p => p.gender === 'F').slice(0, 3)
-    return [...males, ...females]
-  }
-
+  // The active line lives in the rawLog (point-start carries lineA/lineB).
+  // freshSession only sets up the empty session shell.
   return {
     gameConfig:           config,
     gameStartPullingTeam: pullingTeam,
     rawLog:               [],
-    activeLine: {
-      A: seed(config.rosters.A),
-      B: seed(config.rosters.B),
-    },
   }
+}
+
+/** Default seed for the line-selection screen on a *fresh* point: first 4 males + 3 females. */
+export function seedDefaultLine(roster: Player[]): Player[] {
+  const males   = roster.filter(p => p.gender === 'M').slice(0, 4)
+  const females = roster.filter(p => p.gender === 'F').slice(0, 3)
+  return [...males, ...females]
+}
+
+function sameLine(a: PlayerId[], b: PlayerId[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+  return true
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -113,6 +118,7 @@ export const useGameStore = create<GameStore>()(
       selPuller:        null,
       showEventMenu:    false,
       recordingOptions: DEFAULT_RECORDING_OPTIONS,
+      swapSides:        false,
 
       // ── selectGame ──────────────────────────────────────────────────────────
       // Start a fresh game session (overwrites any existing one).
@@ -144,46 +150,39 @@ export const useGameStore = create<GameStore>()(
       },
 
       // ── confirmLine ─────────────────────────────────────────────────────────
-      // Confirms the line for a new point (or for an injury sub).
-      // For new points, appends a 'point-start' event so gamePhase moves to awaiting-pull.
-      // Also appends a 'system' event listing the confirmed line-up for both teams so
-      // the recorder has an audit trail of who was on the field per point.
+      // Encodes the on-field line-up directly into the rawLog. For a new point,
+      // emits 'point-start' carrying lineA/lineB. For an injury sub mid-point,
+      // emits a separate 'injury-sub' event for each team whose line changed.
       confirmLine(lineA, lineB) {
         const { session, isInjurySub } = get()
         if (!session) return
 
-        const newActiveLine = { A: lineA, B: lineB }
-        const teams = session.gameConfig.teams
-        const fmt = (team: 'A' | 'B', line: Player[]) =>
-          `${teams[team].short} line: ${line.map(p => p.name).join(', ')}`
+        const state = deriveGameState(session)
+        const idsA  = lineA.map(p => p.id)
+        const idsB  = lineB.map(p => p.id)
 
         if (isInjurySub) {
-          const state = deriveGameState(session)
-          const updated = appendEvents(
-            { ...session, activeLine: newActiveLine },
-            [
-              { ...baseRawEvent(state.pointIndex), type: 'system', text: `Injury sub — ${fmt('A', lineA)} | ${fmt('B', lineB)}` },
-            ],
-          )
+          const events: RawEventInput[] = []
+          // Diff against current activeLine — only emit per-team events when changed.
+          if (!sameLine(idsA, state.activeLine.A.map(p => p.id))) {
+            events.push({ pointIndex: state.pointIndex, type: 'injury-sub', teamId: 'A', line: idsA })
+          }
+          if (!sameLine(idsB, state.activeLine.B.map(p => p.id))) {
+            events.push({ pointIndex: state.pointIndex, type: 'injury-sub', teamId: 'B', line: idsB })
+          }
           set({
-            session: updated,
-            screen: 'live-entry',
+            session: events.length === 0 ? session : appendEvents(session, events),
+            screen:  'live-entry',
             isInjurySub: false,
-            uiMode: 'idle',
+            uiMode:  'idle',
           })
           return
         }
 
-        // Normal line confirmation: start the next point and log the line-up.
-        const state = deriveGameState(session)
-        const updatedSession = appendEvents(
-          { ...session, activeLine: newActiveLine },
-          [
-            { ...baseRawEvent(state.pointIndex), type: 'point-start' },
-            { ...baseRawEvent(state.pointIndex), type: 'system', text: fmt('A', lineA) },
-            { ...baseRawEvent(state.pointIndex), type: 'system', text: fmt('B', lineB) },
-          ],
-        )
+        // Normal line confirmation: start the next point with the agreed line-up.
+        const updatedSession = appendEvents(session, [
+          { pointIndex: state.pointIndex, type: 'point-start', lineA: idsA, lineB: idsB },
+        ])
         set({
           session:   updatedSession,
           screen:    'live-entry',
@@ -201,26 +200,17 @@ export const useGameStore = create<GameStore>()(
         // Pick-mode dispatch — registry-driven (see core/pickModes.ts)
         if (isPickMode(uiMode)) {
           const { onTap } = PICK_MODES[uiMode]
-          if (onTap.kind === 'navigate') {
-            set({
-              screen:        onTap.screen,
-              isInjurySub:   onTap.setIsInjurySub ?? false,
-              showEventMenu: false,
-              uiMode:        'idle',
-            })
-            return
-          }
           if (!canRecord(state, onTap.eventType)) return
           // Receiver Error can't be the thrower — guard against UI bypass
           if (onTap.eventType === 'turnover-receiver-error' && player.id === state.discHolder) return
           const teamId = onTap.team === 'defending' ? otherTeam(state.possession) : state.possession
           set({
             session: appendEvents(session, [{
-              ...baseRawEvent(state.pointIndex),
+              pointIndex: state.pointIndex,
               type:     onTap.eventType,
               playerId: player.id,
               teamId,
-            } as RawEvent]),
+            } as RawEventInput]),
             uiMode: 'idle',
           })
           return
@@ -240,7 +230,7 @@ export const useGameStore = create<GameStore>()(
 
           set({
             session: appendEvents(session, [{
-              ...baseRawEvent(state.pointIndex),
+              pointIndex: state.pointIndex,
               type:     'possession',
               playerId: player.id,
               teamId:   state.possession,
@@ -260,7 +250,7 @@ export const useGameStore = create<GameStore>()(
         const pullingTeam = otherTeam(state.possession)
         set({
           session: appendEvents(session, [{
-            ...baseRawEvent(state.pointIndex),
+            pointIndex: state.pointIndex,
             type:     bonus ? 'pull-bonus' : 'pull',
             playerId: selPuller,
             teamId:   pullingTeam,
@@ -278,7 +268,7 @@ export const useGameStore = create<GameStore>()(
 
         set({
           session: appendEvents(session, [{
-            ...baseRawEvent(state.pointIndex),
+            pointIndex: state.pointIndex,
             type:     'turnover-throw-away',
             playerId: state.discHolder,
             teamId:   state.possession,
@@ -305,8 +295,8 @@ export const useGameStore = create<GameStore>()(
         const state = deriveGameState(session)
         if (!canRecord(state, 'goal') || !state.discHolder) return
 
-        const events: RawEvent[] = [{
-          ...baseRawEvent(state.pointIndex),
+        const events: RawEventInput[] = [{
+          pointIndex: state.pointIndex,
           type:     'goal',
           playerId: state.discHolder,
           teamId:   state.possession,
@@ -319,9 +309,9 @@ export const useGameStore = create<GameStore>()(
         const half = session.gameConfig.halfTimeAt
 
         if (newScore.A >= cap || newScore.B >= cap) {
-          events.push({ ...baseRawEvent(state.pointIndex), type: 'end-game' })
+          events.push({ pointIndex: state.pointIndex, type: 'end-game' })
         } else if (total === half) {
-          events.push({ ...baseRawEvent(state.pointIndex), type: 'half-time' })
+          events.push({ pointIndex: state.pointIndex, type: 'half-time' })
         }
 
         set({ session: appendEvents(session, events) })
@@ -341,7 +331,7 @@ export const useGameStore = create<GameStore>()(
         if (!session) return
         const state = deriveGameState(session)
         set({
-          session: appendEvents(session, [{ ...baseRawEvent(state.pointIndex), type: 'undo' }]),
+          session: appendEvents(session, [{ pointIndex: state.pointIndex, type: 'undo' }]),
           uiMode: 'idle',
           selPuller: null,
         })
@@ -354,7 +344,7 @@ export const useGameStore = create<GameStore>()(
         const state = deriveGameState(session)
         if (!canRecord(state, 'half-time')) return
         set({
-          session: appendEvents(session, [{ ...baseRawEvent(state.pointIndex), type: 'half-time' }]),
+          session: appendEvents(session, [{ pointIndex: state.pointIndex, type: 'half-time' }]),
           showEventMenu: false,
         })
       },
@@ -365,14 +355,21 @@ export const useGameStore = create<GameStore>()(
         const state = deriveGameState(session)
         if (!canRecord(state, 'end-game')) return
         set({
-          session: appendEvents(session, [{ ...baseRawEvent(state.pointIndex), type: 'end-game' }]),
+          session: appendEvents(session, [{ pointIndex: state.pointIndex, type: 'end-game' }]),
           showEventMenu: false,
         })
       },
 
       // ── triggerInjurySub ────────────────────────────────────────────────────
+      // Injury subs skip the per-player tap and go straight to line selection,
+      // so multiple players can be swapped at once.
       triggerInjurySub() {
-        set({ uiMode: 'injury-pick', showEventMenu: false })
+        set({
+          screen:        'line-selection',
+          isInjurySub:   true,
+          showEventMenu: false,
+          uiMode:        'idle',
+        })
       },
 
       // ── cancelPickMode ──────────────────────────────────────────────────────
@@ -393,19 +390,20 @@ export const useGameStore = create<GameStore>()(
       },
 
       // ── reorderActiveLine ────────────────────────────────────────────────────
-      // Reorders the on-field display order for a team. Pure visual rearrangement.
+      // Reorders the on-field display order for a team. Recorded as a
+      // 'reorder-line' event so other peers see the same order on sync.
       reorderActiveLine(teamId, fromIdx, toIdx) {
         const { session } = get()
         if (!session || fromIdx === toIdx) return
-        const line = [...session.activeLine[teamId]]
-        if (fromIdx < 0 || fromIdx >= line.length || toIdx < 0 || toIdx >= line.length) return
-        const [moved] = line.splice(fromIdx, 1)
-        line.splice(toIdx, 0, moved)
+        const state = deriveGameState(session)
+        const current = state.activeLine[teamId].map(p => p.id)
+        if (fromIdx < 0 || fromIdx >= current.length || toIdx < 0 || toIdx >= current.length) return
+        const [moved] = current.splice(fromIdx, 1)
+        current.splice(toIdx, 0, moved)
         set({
-          session: {
-            ...session,
-            activeLine: { ...session.activeLine, [teamId]: line },
-          },
+          session: appendEvents(session, [
+            { pointIndex: state.pointIndex, type: 'reorder-line', teamId, line: current },
+          ]),
         })
       },
 
@@ -428,7 +426,7 @@ export const useGameStore = create<GameStore>()(
         const state = deriveGameState(session)
         if (!canRecord(state, 'foul')) return
         set({
-          session: appendEvents(session, [{ ...baseRawEvent(state.pointIndex), type: 'foul' }]),
+          session: appendEvents(session, [{ pointIndex: state.pointIndex, type: 'foul' }]),
           showEventMenu: false,
         })
       },
@@ -439,7 +437,7 @@ export const useGameStore = create<GameStore>()(
         const state = deriveGameState(session)
         if (!canRecord(state, 'pick')) return
         set({
-          session: appendEvents(session, [{ ...baseRawEvent(state.pointIndex), type: 'pick' }]),
+          session: appendEvents(session, [{ pointIndex: state.pointIndex, type: 'pick' }]),
           showEventMenu: false,
         })
       },
@@ -451,7 +449,7 @@ export const useGameStore = create<GameStore>()(
         if (!canRecord(state, 'turnover-stall') || !state.discHolder) return
         set({
           session: appendEvents(session, [{
-            ...baseRawEvent(state.pointIndex),
+            pointIndex: state.pointIndex,
             type:     'turnover-stall',
             playerId: state.discHolder,
             teamId:   state.possession,
@@ -465,7 +463,7 @@ export const useGameStore = create<GameStore>()(
         const state = deriveGameState(session)
         if (!canRecord(state, 'timeout')) return
         set({
-          session: appendEvents(session, [{ ...baseRawEvent(state.pointIndex), type: 'timeout' }]),
+          session: appendEvents(session, [{ pointIndex: state.pointIndex, type: 'timeout' }]),
           showEventMenu: false,
         })
       },
@@ -487,17 +485,34 @@ export const useGameStore = create<GameStore>()(
       setShowEventMenu(show) {
         set({ showEventMenu: show })
       },
+
+      // ── toggleSwapSides ──────────────────────────────────────────────────────
+      // Flip which physical side of the screen each team renders on. Per-device
+      // display preference — used when teams swap ends or the scorer walks
+      // around to the other touchline. Not synced over the wire.
+      toggleSwapSides() {
+        set(s => ({ swapSides: !s.swapSides }))
+      },
     }),
     {
       name:    STORAGE_KEY,
       version: STORAGE_VERSION,
       storage: createJSONStorage(() => localStorage),
-      migrate: (persisted) => {
-        // Always merge persisted recordingOptions with current defaults so newly-added
-        // option fields (e.g. lineRatio) get sensible values without losing user toggles.
-        const obj = persisted as { recordingOptions?: Partial<RecordingOptions> }
+      migrate: (persisted, fromVersion) => {
+        const obj = persisted as {
+          recordingOptions?: Partial<RecordingOptions>
+          session?: unknown
+          screen?: AppScreen
+        }
+        // v4 changed PlayerId / EventId from string to number; v5 derived
+        // activeLine from rawLog and reshaped point-start / injury-sub events.
+        // Both transitions are not back-compatible at the event level, so any
+        // session predating v5 is dropped and the user starts fresh.
+        const dropping = fromVersion < 5
         return {
           ...obj,
+          session:          dropping ? null            : (obj.session ?? null),
+          screen:           dropping ? 'game-setup'    : (obj.screen ?? 'game-setup'),
           recordingOptions: { ...DEFAULT_RECORDING_OPTIONS, ...(obj.recordingOptions ?? {}) },
         }
       },
@@ -508,6 +523,7 @@ export const useGameStore = create<GameStore>()(
         uiMode:           state.uiMode,
         selPuller:        state.selPuller,
         recordingOptions: state.recordingOptions,
+        swapSides:        state.swapSides,
       }),
     },
   ),

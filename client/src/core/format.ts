@@ -5,13 +5,17 @@ import type { VisLogEntry, Player, PlayerId } from './types'
 // Kept separate so i18n / alternative renderings can plug in here.
 
 function nameLookup(players: Player[]) {
-  return (id: PlayerId) => players.find(p => p.id === id)?.name ?? id
+  return (id: PlayerId) => players.find(p => p.id === id)?.name ?? String(id)
 }
 
 export function formatVisLogEntry(entry: VisLogEntry, players: Player[]): string {
   const name = nameLookup(players)
   switch (entry.type) {
-    case 'point-start':              return '— Point Started —'
+    case 'point-start': {
+      const lineNames = (ids: PlayerId[] | undefined) =>
+        Array.isArray(ids) ? ids.map(name).join(', ') : '—'
+      return `— Point Started — A: ${lineNames(entry.lineA)} | B: ${lineNames(entry.lineB)}`
+    }
     case 'pull':                     return `Pull — ${name(entry.playerId)}`
     case 'pull-bonus':               return `Pull Bonus — ${name(entry.playerId)}`
     case 'possession':               return `Possession: ${name(entry.playerId)}`
@@ -21,7 +25,7 @@ export function formatVisLogEntry(entry: VisLogEntry, players: Player[]): string
     case 'block':                    return `Blocked by Defence — ${name(entry.playerId)}`
     case 'intercept':                return `Intercepted by Defence — ${name(entry.playerId)}`
     case 'goal':                     return `Goal — ${name(entry.playerId)}`
-    case 'injury-sub':               return `Injury Sub — ${name(entry.outPlayerId)} → ${name(entry.inPlayerId)}`
+    case 'injury-sub':               return `Injury Sub — ${entry.teamId}: ${Array.isArray(entry.line) ? entry.line.map(name).join(', ') : '—'}`
     case 'half-time':                return '— Half Time —'
     case 'end-game':                 return '— Game Over —'
     case 'timeout':                  return 'Timeout'

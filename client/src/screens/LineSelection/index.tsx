@@ -2,23 +2,29 @@ import { useState } from 'react'
 import { Btn } from '@/components/ui/Btn'
 import { Chip } from '@/components/ui/Chip'
 import { Label } from '@/components/ui/Label'
-import { useSession, useRecordingOptions } from '@/core/selectors'
-import { useGameStore } from '@/core/store'
+import { useSession, useDerivedState, useRecordingOptions } from '@/core/selectors'
+import { useGameStore, seedDefaultLine } from '@/core/store'
 import type { Player, GameMode } from '@/core/types'
 
 export default function LineSelection() {
   const session        = useSession()
+  const state          = useDerivedState()
   const isInjurySub    = useGameStore(s => s.isInjurySub)
   const confirmLine    = useGameStore(s => s.confirmLine)
   const backToGameList = useGameStore(s => s.backToGameList)
+  const swapSides      = useGameStore(s => s.swapSides)
+  const toggleSwap     = useGameStore(s => s.toggleSwapSides)
   const { lineRatio, gameMode } = useRecordingOptions()
 
-  const rosters    = session?.gameConfig.rosters
-  const teams      = session?.gameConfig.teams
-  const activeLine = session?.activeLine
+  const rosters = session?.gameConfig.rosters
+  const teams   = session?.gameConfig.teams
 
-  const [selA, setSelA] = useState<Player[]>(activeLine?.A ?? [])
-  const [selB, setSelB] = useState<Player[]>(activeLine?.B ?? [])
+  // Seed selection from the derived activeLine if it's been set (mid-game), or
+  // from a sensible default of the roster otherwise (very first point).
+  const initialA = (state && state.activeLine.A.length > 0) ? state.activeLine.A : (rosters ? seedDefaultLine(rosters.A) : [])
+  const initialB = (state && state.activeLine.B.length > 0) ? state.activeLine.B : (rosters ? seedDefaultLine(rosters.B) : [])
+  const [selA, setSelA] = useState<Player[]>(initialA)
+  const [selB, setSelB] = useState<Player[]>(initialB)
   const [overrideOpen, setOverrideOpen] = useState(false)
 
   if (!rosters || !teams) return null
@@ -45,7 +51,7 @@ export default function LineSelection() {
   }
 
   const headerSummary = isInjurySub
-    ? 'Swap one player, then confirm'
+    ? 'Swap any players, then confirm'
     : gameMode === 'open'
       ? `Pick ${target} players per team`
       : `Pick ${lineRatio.M} male-matching and ${lineRatio.F} female-matching per team (${target} total)`
@@ -67,31 +73,38 @@ export default function LineSelection() {
           <div className="text-sm font-bold">{headerSummary}</div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleSwap}
+            className="text-muted hover:text-content transition-colors cursor-pointer text-base leading-none px-2"
+            title="Swap team sides"
+          >
+            ⇆
+          </button>
           <Btn variant="primary" size="md" onClick={onConfirmClick}>
-            {isInjurySub ? 'Confirm Sub' : 'Confirm Line →'}
+            {isInjurySub ? 'Confirm Substitutions' : 'Confirm Line →'}
           </Btn>
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
         <TeamColumn
-          players={rosters.A}
-          selected={selA}
-          color={teams.A.color}
-          label={teams.A.name}
-          onToggle={p => toggle(p, selA, setSelA)}
-          onSetAll={setSelA}
+          players={rosters[swapSides ? 'B' : 'A']}
+          selected={swapSides ? selB : selA}
+          color={teams[swapSides ? 'B' : 'A'].color}
+          label={teams[swapSides ? 'B' : 'A'].name}
+          onToggle={p => toggle(p, swapSides ? selB : selA, swapSides ? setSelB : setSelA)}
+          onSetAll={swapSides ? setSelB : setSelA}
           gameMode={gameMode}
           targetM={lineRatio.M}
           targetF={lineRatio.F}
         />
         <TeamColumn
-          players={rosters.B}
-          selected={selB}
-          color={teams.B.color}
-          label={teams.B.name}
-          onToggle={p => toggle(p, selB, setSelB)}
-          onSetAll={setSelB}
+          players={rosters[swapSides ? 'A' : 'B']}
+          selected={swapSides ? selA : selB}
+          color={teams[swapSides ? 'A' : 'B'].color}
+          label={teams[swapSides ? 'A' : 'B'].name}
+          onToggle={p => toggle(p, swapSides ? selA : selB, swapSides ? setSelA : setSelB)}
+          onSetAll={swapSides ? setSelA : setSelB}
           align="right"
           gameMode={gameMode}
           targetM={lineRatio.M}
@@ -214,7 +227,7 @@ function TeamColumn({
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
-        {players.map(p => {
+        {[...players].sort((a, b) => a.name.localeCompare(b.name)).map(p => {
           const isOn = !!selected.find(s => s.id === p.id)
           return (
             <button

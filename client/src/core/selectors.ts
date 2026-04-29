@@ -6,26 +6,17 @@ import { MOCK_GAMES } from './data'
 import type { DerivedGameState, VisLogEntry, GameSession, RecordingOptions } from './types'
 import { DEFAULT_RECORDING_OPTIONS } from './types'
 
-// Refresh the persisted session's gameConfig (and re-resolve activeLine players by id)
-// from the current MOCK_GAMES. Lets new fields on Player / GameConfig (e.g. gender) flow
-// into existing sessions without a storage migration.
+// Refresh the persisted session's gameConfig from current MOCK_GAMES so
+// roster/config edits flow into existing sessions without a migration.
+// (Active line is derived from rawLog + this fresh roster, so it picks up
+// updated names / portraits automatically.)
 function resolveSession(session: GameSession): GameSession {
   const fresh = MOCK_GAMES.find(g => g.id === session.gameConfig.id)
   if (!fresh) return session
-  const resolve = (p: { id: string }, teamId: 'A' | 'B') =>
-    fresh.rosters[teamId].find(rp => rp.id === p.id) ?? p
-  return {
-    ...session,
-    gameConfig: fresh,
-    activeLine: {
-      A: session.activeLine.A.map(p => resolve(p, 'A') as typeof p),
-      B: session.activeLine.B.map(p => resolve(p, 'B') as typeof p),
-    },
-  }
+  return { ...session, gameConfig: fresh }
 }
 
 // Single subscription to the session — re-derives only when session reference changes.
-// (Session reference changes only when an action mutates the rawLog or activeLine.)
 
 export function useSession(): GameSession | null {
   const stored = useGameStore(s => s.session)
