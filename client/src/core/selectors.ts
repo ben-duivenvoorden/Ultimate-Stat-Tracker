@@ -22,32 +22,26 @@ export function useVisLog(): VisLogEntry[] {
   return useMemo(() => (session ? computeVisLog(session.rawLog) : []), [session])
 }
 
-// Shallow-equality selector for picking out multiple action callbacks at once
-// without causing re-renders when unrelated state changes.
-export function useGameActions() {
-  return useGameStore(useShallow(s => ({
-    selectGame:           s.selectGame,
-    resumeGame:           s.resumeGame,
-    confirmLine:          s.confirmLine,
-    nextPoint:            s.nextPoint,
-    backToGameList:       s.backToGameList,
-    tapPlayer:            s.tapPlayer,
-    recordPull:           s.recordPull,
-    recordThrowAway:      s.recordThrowAway,
-    triggerReceiverError: s.triggerReceiverError,
-    recordGoal:           s.recordGoal,
-    triggerDefBlock:      s.triggerDefBlock,
-    recordFoul:           s.recordFoul,
-    recordPick:           s.recordPick,
-    recordStall:          s.recordStall,
-    recordTimeout:        s.recordTimeout,
-    undo:                 s.undo,
-    triggerHalfTime:      s.triggerHalfTime,
-    triggerEndGame:       s.triggerEndGame,
-    triggerInjurySub:     s.triggerInjurySub,
-    cancelPickMode:       s.cancelPickMode,
-    setShowEventMenu:     s.setShowEventMenu,
-  })))
+// ─── Action accessor ──────────────────────────────────────────────────────────
+// Auto-derived from the store: every function on GameStore is exposed.
+// No hand-maintained list = no drift when actions are added/renamed.
+
+type StoreShape = ReturnType<typeof useGameStore.getState>
+type GameActions = {
+  [K in keyof StoreShape as StoreShape[K] extends (...args: never[]) => unknown ? K : never]: StoreShape[K]
+}
+
+function pickActions(s: StoreShape): GameActions {
+  const out: Record<string, unknown> = {}
+  for (const k in s) {
+    const v = s[k as keyof StoreShape]
+    if (typeof v === 'function') out[k] = v
+  }
+  return out as GameActions
+}
+
+export function useGameActions(): GameActions {
+  return useGameStore(useShallow(pickActions))
 }
 
 export function useRecordingOptions(): RecordingOptions {

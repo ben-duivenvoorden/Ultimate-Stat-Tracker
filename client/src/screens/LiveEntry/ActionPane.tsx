@@ -1,6 +1,7 @@
 import { Label } from '@/components/ui/Label'
 import { Btn } from '@/components/ui/Btn'
 import type { GamePhase, UiMode, RecordingOptions } from '@/core/types'
+import { PICK_MODES, isPickMode, resolveContextLabel, type PickUiMode } from '@/core/pickModes'
 import { TerminalPanel, type TerminalPanelProps } from './TerminalPanel'
 
 interface ActionPaneProps {
@@ -42,33 +43,26 @@ export function ActionPane({
   terminalProps,
 }: ActionPaneProps) {
   const isTerminal = gamePhase === 'point-over' || gamePhase === 'half-time' || gamePhase === 'game-over'
-  const isPickMode = uiMode === 'block-pick' || uiMode === 'intercept-pick' || uiMode === 'receiver-error-pick' || uiMode === 'injury-pick'
+  const pickMode   = isPickMode(uiMode) ? uiMode : null
   const isPullPhase = gamePhase === 'awaiting-pull'
-  const armed = gamePhase === 'in-play' && discHolderName !== null && !isPickMode
+  const armed = gamePhase === 'in-play' && discHolderName !== null && !pickMode
 
-  const contextLabel =
-    isPickMode
-      ? uiMode === 'injury-pick'       ? 'TAP INJURED PLAYER'
-      : uiMode === 'receiver-error-pick' ? 'TAP PLAYER WHO HAD ERROR'
-      : uiMode === 'intercept-pick'   ? `PICK INTERCEPTOR FROM ${defendingShort}`
-      :                                  `PICK BLOCKER FROM ${defendingShort}`
+  const contextLabel = pickMode
+    ? resolveContextLabel(pickMode, { defendingShort })
     : isPullPhase
       ? selPullerName ? selPullerName.toUpperCase() : 'TAP PULLER FIRST'
     : discHolderName
       ? `DISC WITH ${discHolderName.toUpperCase()}`
       : 'TAP PLAYER FIRST'
 
-  const contextColor =
-    uiMode === 'injury-pick' ? 'var(--color-warn)' :
-    uiMode === 'block-pick' || uiMode === 'intercept-pick' ? 'var(--color-block)' :
-    'var(--color-muted)'
+  const contextColor = pickMode ? PICK_MODES[pickMode].color : 'var(--color-muted)'
 
   return (
     <div
       className="flex-1 flex flex-col"
       style={{ borderLeft: '1px solid var(--color-border)', borderRight: '1px solid var(--color-border)' }}
     >
-      {!isPickMode && (
+      {!pickMode && (
         <div
           className="flex-shrink-0 h-7 flex items-center px-2.5 gap-1.5"
           style={{ borderBottom: '1px solid var(--color-border)' }}
@@ -79,8 +73,8 @@ export function ActionPane({
 
       {isTerminal ? (
         <TerminalPanel {...terminalProps} />
-      ) : isPickMode ? (
-        <PickModePlaceholder uiMode={uiMode} defendingShort={defendingShort} onCancel={onCancelPickMode} />
+      ) : pickMode ? (
+        <PickModePlaceholder uiMode={pickMode} onCancel={onCancelPickMode} />
       ) : isPullPhase ? (
         <div className="flex-1 p-1.5 flex flex-col gap-1.5">
           <ActionTile label="Pull"       variant="primary" disabled={!pullerSelected} onClick={() => onRecordPull(false)} />
@@ -105,7 +99,7 @@ export function ActionPane({
       )}
 
       {/* Stoppages button */}
-      {!isTerminal && !isPickMode && !(gamePhase === 'pre-game') && (
+      {!isTerminal && !pickMode && !(gamePhase === 'pre-game') && (
         <div className="flex-shrink-0 p-1.5" style={{ borderTop: '1px solid var(--color-border)' }}>
           <Btn variant="ghost" size="sm" full onClick={() => setShowEventMenu(!showEventMenu)}>
             Stoppages
@@ -200,24 +194,12 @@ function Separator({ children }: { children: string }) {
 
 function PickModePlaceholder({
   uiMode,
-  defendingShort,
   onCancel,
 }: {
-  uiMode: UiMode
-  defendingShort: string
+  uiMode: PickUiMode
   onCancel: () => void
 }) {
-  const isInjury        = uiMode === 'injury-pick'
-  const isIntercept     = uiMode === 'intercept-pick'
-  const isReceiverError = uiMode === 'receiver-error-pick'
-  const color = isInjury        ? 'var(--color-warn)'
-              : isReceiverError ? 'var(--color-warn)'
-              : isIntercept     ? 'var(--color-intercept)'
-              :                   'var(--color-block)'
-  const label = isInjury        ? 'Injury Sub'
-              : isReceiverError ? 'Receiver Error'
-              : isIntercept     ? 'Defensive Intercept'
-              :                   'Defensive Block'
+  const { color, displayName } = PICK_MODES[uiMode]
 
   return (
     <div className="flex-1 p-1.5 flex flex-col gap-1.5">
@@ -225,7 +207,7 @@ function PickModePlaceholder({
         className="flex-shrink-0 h-12 rounded-lg flex items-center justify-center text-sm font-bold border"
         style={{ background: `${color}28`, borderColor: color, color }}
       >
-        {label}
+        {displayName}
       </div>
       <div className="flex-1" />
       <Btn variant="ghost" size="sm" full onClick={onCancel}>

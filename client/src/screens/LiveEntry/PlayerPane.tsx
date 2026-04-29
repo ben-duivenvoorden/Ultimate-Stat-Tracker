@@ -1,7 +1,8 @@
 import type { Player } from '@/core/types'
+import { PICK_MODES, type PickUiMode } from '@/core/pickModes'
 import { Label } from '@/components/ui/Label'
 
-export type PlayerPaneMode = 'normal' | 'pull' | 'block' | 'intercept' | 'receiver-error' | 'injury'
+export type PlayerPaneMode = 'normal' | 'pull' | PickUiMode
 
 interface PlayerPaneProps {
   players: Player[]
@@ -22,14 +23,14 @@ interface PlayerPaneProps {
   onTap: (player: Player) => void
 }
 
-const modeMeta = {
-  normal:          { bg: 'var(--color-bg)',           label: 'POSSESSION',       accent: null },
-  pull:            { bg: 'var(--color-bg)',           label: 'PULLING',          accent: null },
-  block:           { bg: 'var(--color-block-bg)',     label: 'PICK BLOCKER',     accent: 'var(--color-block)' },
-  intercept:       { bg: 'var(--color-intercept-bg)', label: 'PICK INTERCEPTOR', accent: 'var(--color-intercept)' },
-  'receiver-error': { bg: 'var(--color-warn-bg)',     label: 'PICK PLAYER',      accent: 'var(--color-warn)' },
-  injury:          { bg: 'var(--color-injury-bg)',   label: 'PICK INJURED',     accent: 'var(--color-warn)' },
-} as const
+interface PaneMeta { bg: string; label: string; accent: string | null }
+
+function paneMeta(mode: PlayerPaneMode): PaneMeta {
+  if (mode === 'normal') return { bg: 'var(--color-bg)', label: 'POSSESSION', accent: null }
+  if (mode === 'pull')   return { bg: 'var(--color-bg)', label: 'PULLING',    accent: null }
+  const cfg = PICK_MODES[mode]
+  return { bg: cfg.bgColor, label: cfg.paneLabel, accent: cfg.color }
+}
 
 export function PlayerPane({
   players, teamColor, teamShort,
@@ -37,8 +38,9 @@ export function PlayerPane({
   mode, discHolderId, selPullerId, align,
   onTap,
 }: PlayerPaneProps) {
-  const { bg, label, accent } = modeMeta[mode]
+  const { bg, label, accent } = paneMeta(mode)
   const isRight = align === 'right'
+  const isPickMode = accent !== null
 
   return (
     <div
@@ -82,7 +84,6 @@ export function PlayerPane({
       >
         {players.map(p => {
           const isHighlit  = p.id === discHolderId || p.id === selPullerId
-          const isPickMode = mode === 'block' || mode === 'intercept' || mode === 'injury'
           const activeColor = isPickMode ? accent! : teamColor
 
           return (

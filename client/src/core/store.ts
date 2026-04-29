@@ -17,6 +17,7 @@ import {
   appendEvents,
   baseRawEvent,
 } from './engine'
+import { PICK_MODES, isPickMode } from './pickModes'
 import { MOCK_GAMES } from './data'
 
 // ─── Store shape ──────────────────────────────────────────────────────────────
@@ -173,39 +174,27 @@ export const useGameStore = create<GameStore>()(
         if (!session) return
         const state = deriveGameState(session)
 
-        // Injury pick: route to line-selection screen
-        if (uiMode === 'injury-pick') {
-          set({ screen: 'line-selection', isInjurySub: true, showEventMenu: false, uiMode: 'idle' })
-          return
-        }
-
-        // Block / intercept pick: record the blocker
-        if (uiMode === 'block-pick' || uiMode === 'intercept-pick') {
-          const type: RawEvent['type'] = uiMode === 'intercept-pick' ? 'intercept' : 'block'
-          const defendingTeam = otherTeam(state.possession)
-          if (!canRecord(state, type)) return
+        // Pick-mode dispatch — registry-driven (see core/pickModes.ts)
+        if (isPickMode(uiMode)) {
+          const { onTap } = PICK_MODES[uiMode]
+          if (onTap.kind === 'navigate') {
+            set({
+              screen:        onTap.screen,
+              isInjurySub:   onTap.setIsInjurySub ?? false,
+              showEventMenu: false,
+              uiMode:        'idle',
+            })
+            return
+          }
+          if (!canRecord(state, onTap.eventType)) return
+          const teamId = onTap.team === 'defending' ? otherTeam(state.possession) : state.possession
           set({
             session: appendEvents(session, [{
               ...baseRawEvent(state.pointIndex),
-              type,
+              type:     onTap.eventType,
               playerId: player.id,
-              teamId:   defendingTeam,
-            }]),
-            uiMode: 'idle',
-          })
-          return
-        }
-
-        // Receiver error pick: record the player who had the error
-        if (uiMode === 'receiver-error-pick') {
-          if (!canRecord(state, 'turnover-receiver-error')) return
-          set({
-            session: appendEvents(session, [{
-              ...baseRawEvent(state.pointIndex),
-              type:     'turnover-receiver-error',
-              playerId: player.id,
-              teamId:   state.possession,
-            }]),
+              teamId,
+            } as RawEvent]),
             uiMode: 'idle',
           })
           return

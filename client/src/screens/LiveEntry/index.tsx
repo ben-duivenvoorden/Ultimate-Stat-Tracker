@@ -1,6 +1,7 @@
 import { useSession, useDerivedState, useVisLog, useGameActions, useUiState, useRecordingOptions } from '@/core/selectors'
 import { useGameStore } from '@/core/store'
-import { otherTeam, type TeamId } from '@/core/types'
+import { otherTeam } from '@/core/types'
+import { isPickMode, pickActiveTeam } from '@/core/pickModes'
 import { Label } from '@/components/ui/Label'
 import { PlayerPane, type PlayerPaneMode } from './PlayerPane'
 import { ActionPane } from './ActionPane'
@@ -21,25 +22,18 @@ export default function LiveEntry() {
   const { teams } = session.gameConfig
   const { gameStartPullingTeam } = session
 
-  const isPickMode  = ui.uiMode === 'block-pick' || ui.uiMode === 'intercept-pick' || ui.uiMode === 'receiver-error-pick' || ui.uiMode === 'injury-pick'
+  const pickMode    = isPickMode(ui.uiMode) ? ui.uiMode : null
   const isPullPhase = state.gamePhase === 'awaiting-pull'
   const isTerminal  = state.gamePhase === 'point-over' || state.gamePhase === 'half-time' || state.gamePhase === 'game-over'
 
   // Which team's players are "active" (shown, interactable)
-  let activeTeam: TeamId
-  if (isPullPhase || ui.uiMode === 'block-pick' || ui.uiMode === 'intercept-pick') {
-    activeTeam = otherTeam(state.possession)
-  } else {
-    activeTeam = state.possession
-  }
+  const activeTeam = pickMode
+    ? pickActiveTeam(pickMode, state.possession)
+    : isPullPhase
+      ? otherTeam(state.possession)
+      : state.possession
 
-  const playerMode: PlayerPaneMode =
-    ui.uiMode === 'injury-pick'        ? 'injury' :
-    ui.uiMode === 'receiver-error-pick' ? 'receiver-error' :
-    ui.uiMode === 'intercept-pick'     ? 'intercept' :
-    ui.uiMode === 'block-pick'         ? 'block' :
-    isPullPhase                        ? 'pull' :
-    'normal'
+  const playerMode: PlayerPaneMode = pickMode ?? (isPullPhase ? 'pull' : 'normal')
 
   const allPlayers     = [...session.gameConfig.rosters.A, ...session.gameConfig.rosters.B]
   const lookupName     = (id: string | null) => id ? (allPlayers.find(p => p.id === id)?.name ?? id) : null
@@ -159,7 +153,7 @@ export default function LiveEntry() {
             display:    'flex',
             background: 'var(--color-bg)',
           }}
-          onClick={isPickMode ? actions.cancelPickMode : undefined}
+          onClick={pickMode ? actions.cancelPickMode : undefined}
         >
           <ActionPane
             gamePhase={state.gamePhase}
