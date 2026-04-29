@@ -15,6 +15,7 @@ export default function LineSelection() {
   const rosters    = session?.gameConfig.rosters
   const teams      = session?.gameConfig.teams
   const activeLine = session?.activeLine
+  const lineSize   = session?.gameConfig.lineSize ?? 7
 
   const [selA, setSelA] = useState<Player[]>(activeLine?.A ?? [])
   const [selB, setSelB] = useState<Player[]>(activeLine?.B ?? [])
@@ -24,14 +25,14 @@ export default function LineSelection() {
   const toggle = (player: Player, sel: Player[], setSel: (p: Player[]) => void) => {
     if (sel.find(p => p.id === player.id)) {
       setSel(sel.filter(p => p.id !== player.id))
-    } else if (sel.length < 7) {
+    } else {
       setSel([...sel, player])
     }
   }
 
-  const canConfirm = selA.length > 0 && selB.length > 0
-  const warnA = selA.length > 0 && selA.length < 7
-  const warnB = selB.length > 0 && selB.length < 7
+  const canConfirm = selA.length === lineSize && selB.length === lineSize
+  const tooManyA = selA.length > lineSize
+  const tooManyB = selB.length > lineSize
 
   return (
     <div className="h-full flex flex-col bg-bg text-content">
@@ -48,11 +49,11 @@ export default function LineSelection() {
             {isInjurySub ? 'INJURY SUBSTITUTION — MID-POINT' : 'LINE SELECTION'}
           </Label>
           <div className="text-sm font-bold">
-            {isInjurySub ? 'Swap one player, then confirm' : 'Pick up to 7 players per team'}
+            {isInjurySub ? 'Swap one player, then confirm' : `Pick exactly ${lineSize} players per team`}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {(warnA || warnB) && <Chip color="var(--color-warn)">Fewer than 7 selected</Chip>}
+          {(tooManyA || tooManyB) && <Chip color="var(--color-danger)">Too many selected</Chip>}
           <Btn variant="primary" size="md" disabled={!canConfirm} onClick={() => confirmLine(selA, selB)}>
             {isInjurySub ? 'Confirm Sub' : 'Confirm Line →'}
           </Btn>
@@ -67,6 +68,7 @@ export default function LineSelection() {
           label={teams.A.name}
           onToggle={p => toggle(p, selA, setSelA)}
           divider
+          lineSize={lineSize}
         />
         <TeamColumn
           players={rosters.B}
@@ -74,6 +76,7 @@ export default function LineSelection() {
           color={teams.B.color}
           label={teams.B.name}
           onToggle={p => toggle(p, selB, setSelB)}
+          lineSize={lineSize}
         />
       </div>
     </div>
@@ -87,17 +90,18 @@ interface TeamColumnProps {
   label: string
   onToggle: (p: Player) => void
   divider?: boolean
+  lineSize?: number
 }
 
-function TeamColumn({ players, selected, color, label, onToggle, divider }: TeamColumnProps) {
+function TeamColumn({ players, selected, color, label, onToggle, divider, lineSize = 7 }: TeamColumnProps) {
   const count = selected.length
-  const countColor = count === 7 ? 'var(--color-success)' : count > 0 ? 'var(--color-warn)' : 'var(--color-muted)'
+  const countColor = count > lineSize ? 'var(--color-danger)' : count === lineSize ? 'var(--color-success)' : count > 0 ? 'var(--color-warn)' : 'var(--color-muted)'
 
   return (
     <div className={`flex-1 flex flex-col ${divider ? 'border-r border-border' : ''}`}>
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border flex-shrink-0">
         <span className="text-sm font-bold" style={{ color }}>{label}</span>
-        <Chip color={countColor}>{count} / 7</Chip>
+        <Chip color={countColor}>{count} / {lineSize}</Chip>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">

@@ -155,6 +155,7 @@ export interface GameConfig {
   rosters: Record<TeamId, Player[]>
   halfTimeAt: number
   scoreCapAt: number
+  lineSize: number
 }
 
 export interface ActiveLine {

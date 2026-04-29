@@ -56,6 +56,7 @@ export const MOCK_GAMES: GameConfig[] = [
     rosters: { A: EMPIRE_ROSTER, B: BREEZE_ROSTER },
     halfTimeAt: 8,
     scoreCapAt: 15,
+    lineSize: 7,
   },
   {
     id: 2,
@@ -67,6 +68,7 @@ export const MOCK_GAMES: GameConfig[] = [
     rosters: { A: EMPIRE_ROSTER, B: BREEZE_ROSTER },
     halfTimeAt: 8,
     scoreCapAt: 15,
+    lineSize: 7,
   },
   {
     id: 3,
@@ -77,6 +79,7 @@ export const MOCK_GAMES: GameConfig[] = [
     rosters: { A: EMPIRE_ROSTER, B: BREEZE_ROSTER },
     halfTimeAt: 8,
     scoreCapAt: 15,
+    lineSize: 7,
   },
   {
     id: 4,
@@ -87,5 +90,6 @@ export const MOCK_GAMES: GameConfig[] = [
     rosters: { A: EMPIRE_ROSTER, B: BREEZE_ROSTER },
     halfTimeAt: 8,
     scoreCapAt: 15,
+    lineSize: 7,
   },
 ]
