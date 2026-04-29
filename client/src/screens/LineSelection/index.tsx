@@ -222,7 +222,14 @@ function TeamColumn({
           )}
         </div>
 
-        <span className="text-base font-bold" style={{ color }}>{label}</span>
+        {/* Reserved gutter on the centre-divider side so the team name doesn't
+            run under the swap-sides button. */}
+        <span
+          className="text-base font-bold"
+          style={{ color, [isRight ? 'marginLeft' : 'marginRight']: 22 }}
+        >
+          {label}
+        </span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
