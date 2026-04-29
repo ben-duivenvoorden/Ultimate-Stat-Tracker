@@ -4,14 +4,14 @@ import { Chip } from '@/components/ui/Chip'
 import { Label } from '@/components/ui/Label'
 import { useSession, useRecordingOptions } from '@/core/selectors'
 import { useGameStore } from '@/core/store'
-import type { Player } from '@/core/types'
+import type { Player, GameMode } from '@/core/types'
 
 export default function LineSelection() {
   const session        = useSession()
   const isInjurySub    = useGameStore(s => s.isInjurySub)
   const confirmLine    = useGameStore(s => s.confirmLine)
   const backToGameList = useGameStore(s => s.backToGameList)
-  const { lineRatio }  = useRecordingOptions()
+  const { lineRatio, gameMode } = useRecordingOptions()
 
   const rosters    = session?.gameConfig.rosters
   const teams      = session?.gameConfig.teams
@@ -19,6 +19,7 @@ export default function LineSelection() {
 
   const [selA, setSelA] = useState<Player[]>(activeLine?.A ?? [])
   const [selB, setSelB] = useState<Player[]>(activeLine?.B ?? [])
+  const [overrideOpen, setOverrideOpen] = useState(false)
 
   if (!rosters || !teams) return null
 
@@ -30,22 +31,24 @@ export default function LineSelection() {
     }
   }
 
-  const countByGender = (sel: Player[]) => ({
-    M: sel.filter(p => p.gender === 'M').length,
-    F: sel.filter(p => p.gender === 'F').length,
-  })
-  const matchesRatio = (sel: Player[]) => {
-    const c = countByGender(sel)
-    return c.M === lineRatio.M && c.F === lineRatio.F
-  }
-  const overRatio = (sel: Player[]) => {
-    const c = countByGender(sel)
-    return c.M > lineRatio.M || c.F > lineRatio.F
+  const target = lineRatio.M + lineRatio.F
+  const validateA = validateLine(selA, gameMode, lineRatio)
+  const validateB = validateLine(selB, gameMode, lineRatio)
+  const linesValid = validateA.ok && validateB.ok
+
+  const onConfirmClick = () => {
+    if (linesValid) {
+      confirmLine(selA, selB)
+    } else {
+      setOverrideOpen(true)
+    }
   }
 
-  const canConfirm = matchesRatio(selA) && matchesRatio(selB)
-  const tooMany    = overRatio(selA) || overRatio(selB)
-  const lineSize   = lineRatio.M + lineRatio.F
+  const headerSummary = isInjurySub
+    ? 'Swap one player, then confirm'
+    : gameMode === 'open'
+      ? `Pick ${target} players per team`
+      : `Pick ${lineRatio.M} male-matching and ${lineRatio.F} female-matching per team (${target} total)`
 
   return (
     <div className="h-full flex flex-col bg-bg text-content">
@@ -61,15 +64,10 @@ export default function LineSelection() {
           <Label block className="mb-0.5">
             {isInjurySub ? 'INJURY SUBSTITUTION — MID-POINT' : 'LINE SELECTION'}
           </Label>
-          <div className="text-sm font-bold">
-            {isInjurySub
-              ? 'Swap one player, then confirm'
-              : `Pick ${lineRatio.M} male-matching and ${lineRatio.F} female-matching per team (${lineSize} total)`}
-          </div>
+          <div className="text-sm font-bold">{headerSummary}</div>
         </div>
         <div className="flex items-center gap-2">
-          {tooMany && <Chip color="var(--color-danger)">Too many selected</Chip>}
-          <Btn variant="primary" size="md" disabled={!canConfirm} onClick={() => confirmLine(selA, selB)}>
+          <Btn variant="primary" size="md" onClick={onConfirmClick}>
             {isInjurySub ? 'Confirm Sub' : 'Confirm Line →'}
           </Btn>
         </div>
@@ -82,9 +80,12 @@ export default function LineSelection() {
           color={teams.A.color}
           label={teams.A.name}
           onToggle={p => toggle(p, selA, setSelA)}
+          onSetAll={setSelA}
           divider
+          gameMode={gameMode}
           targetM={lineRatio.M}
           targetF={lineRatio.F}
+          validation={validateA}
         />
         <TeamColumn
           players={rosters.B}
@@ -92,13 +93,59 @@ export default function LineSelection() {
           color={teams.B.color}
           label={teams.B.name}
           onToggle={p => toggle(p, selB, setSelB)}
+          onSetAll={setSelB}
+          gameMode={gameMode}
           targetM={lineRatio.M}
           targetF={lineRatio.F}
+          validation={validateB}
         />
       </div>
+
+      {overrideOpen && (
+        <OverrideDialog
+          teamAName={teams.A.short}
+          teamBName={teams.B.short}
+          validateA={validateA}
+          validateB={validateB}
+          onCancel={() => setOverrideOpen(false)}
+          onConfirm={() => {
+            setOverrideOpen(false)
+            confirmLine(selA, selB)
+          }}
+        />
+      )}
     </div>
   )
 }
+
+// ─── Validation ───────────────────────────────────────────────────────────────
+
+interface LineValidation {
+  ok: boolean
+  warnings: string[]
+}
+
+function validateLine(sel: Player[], mode: GameMode, ratio: { M: number; F: number }): LineValidation {
+  const target = ratio.M + ratio.F
+  const total  = sel.length
+  const warnings: string[] = []
+
+  if (total !== target) {
+    const delta = total - target
+    warnings.push(delta > 0 ? `${delta} too many` : `${-delta} short`)
+  }
+
+  if (mode === 'mixed') {
+    const m = sel.filter(p => p.gender === 'M').length
+    const f = sel.filter(p => p.gender === 'F').length
+    if (m !== ratio.M) warnings.push(`M ${m}/${ratio.M}`)
+    if (f !== ratio.F) warnings.push(`F ${f}/${ratio.F}`)
+  }
+
+  return { ok: warnings.length === 0, warnings }
+}
+
+// ─── Team column ──────────────────────────────────────────────────────────────
 
 interface TeamColumnProps {
   players: Player[]
@@ -106,18 +153,27 @@ interface TeamColumnProps {
   color: string
   label: string
   onToggle: (p: Player) => void
+  onSetAll: (next: Player[]) => void
   divider?: boolean
+  gameMode: GameMode
   targetM: number
   targetF: number
+  validation: LineValidation
 }
 
-function TeamColumn({ players, selected, color, label, onToggle, divider, targetM, targetF }: TeamColumnProps) {
+function TeamColumn({
+  players, selected, color, label, onToggle, onSetAll, divider,
+  gameMode, targetM, targetF, validation,
+}: TeamColumnProps) {
+  const total  = selected.length
   const countM = selected.filter(p => p.gender === 'M').length
   const countF = selected.filter(p => p.gender === 'F').length
+  const target = targetM + targetF
+  const allSelected = players.length > 0 && total === players.length
 
-  const chipColor = (count: number, target: number) =>
-    count > target ? 'var(--color-danger)'
-      : count === target ? 'var(--color-success)'
+  const chipColor = (count: number, t: number) =>
+    count > t ? 'var(--color-danger)'
+      : count === t ? 'var(--color-success)'
       : count > 0 ? 'var(--color-warn)'
       : 'var(--color-muted)'
 
@@ -125,9 +181,37 @@ function TeamColumn({ players, selected, color, label, onToggle, divider, target
     <div className={`flex-1 flex flex-col ${divider ? 'border-r border-border' : ''}`}>
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border flex-shrink-0">
         <span className="text-sm font-bold flex-1" style={{ color }}>{label}</span>
-        <Chip color={chipColor(countM, targetM)}>M {countM}/{targetM}</Chip>
-        <Chip color={chipColor(countF, targetF)}>F {countF}/{targetF}</Chip>
+        {gameMode === 'mixed' ? (
+          <>
+            <Chip color={chipColor(countM, targetM)}>M {countM}/{targetM}</Chip>
+            <Chip color={chipColor(countF, targetF)}>F {countF}/{targetF}</Chip>
+          </>
+        ) : (
+          <Chip color={chipColor(total, target)}>{total}/{target}</Chip>
+        )}
+        <button
+          type="button"
+          onClick={() => onSetAll(allSelected ? [] : players)}
+          className="text-[10px] font-mono uppercase tracking-widest px-2 h-5 rounded border cursor-pointer transition-colors"
+          style={{
+            color: 'var(--color-muted)',
+            borderColor: 'var(--color-border)',
+            background: 'transparent',
+          }}
+          title={allSelected ? 'Deselect all' : 'Select all'}
+        >
+          {allSelected ? 'None' : 'All'}
+        </button>
       </div>
+
+      {!validation.ok && (
+        <div
+          className="px-3 py-1.5 text-[11px] font-mono"
+          style={{ background: 'var(--color-warn-bg)', color: 'var(--color-warn)', borderBottom: '1px solid var(--color-border)' }}
+        >
+          {validation.warnings.join(' · ')}
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">
         {players.map(p => {
@@ -151,13 +235,15 @@ function TeamColumn({ players, selected, color, label, onToggle, divider, target
               >
                 {isOn && '✓'}
               </span>
-              <span
-                className="flex-shrink-0 w-4 text-center text-[10px] font-mono"
-                style={{ color: p.gender === 'F' ? 'var(--color-warn)' : 'var(--color-muted)' }}
-                title={p.gender === 'F' ? 'Female-matching' : 'Male-matching'}
-              >
-                {p.gender}
-              </span>
+              {gameMode === 'mixed' && (
+                <span
+                  className="flex-shrink-0 w-4 text-center text-[10px] font-mono"
+                  style={{ color: p.gender === 'F' ? 'var(--color-warn)' : 'var(--color-muted)' }}
+                  title={p.gender === 'F' ? 'Female-matching' : 'Male-matching'}
+                >
+                  {p.gender}
+                </span>
+              )}
               <span className="text-sm flex-1" style={{
                 fontWeight: isOn ? 600 : 400,
                 color: isOn ? 'var(--color-content)' : 'var(--color-muted)',
@@ -172,6 +258,60 @@ function TeamColumn({ players, selected, color, label, onToggle, divider, target
             </button>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Override dialog ──────────────────────────────────────────────────────────
+
+interface OverrideDialogProps {
+  teamAName: string
+  teamBName: string
+  validateA: LineValidation
+  validateB: LineValidation
+  onCancel: () => void
+  onConfirm: () => void
+}
+
+function OverrideDialog({ teamAName, teamBName, validateA, validateB, onCancel, onConfirm }: OverrideDialogProps) {
+  return (
+    <div
+      className="absolute inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.65)' }}
+      onClick={onCancel}
+    >
+      <div
+        className="rounded-xl p-5 w-full max-w-sm flex flex-col gap-3"
+        style={{ background: 'var(--color-surf)', border: '1px solid var(--color-border-2)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="text-sm font-bold text-content">Confirm with mismatch?</div>
+        <div className="text-[12px]" style={{ color: 'var(--color-muted)' }}>
+          The line(s) below don't match the configured composition. You can override and continue, or cancel and adjust.
+        </div>
+
+        {!validateA.ok && (
+          <div
+            className="px-3 py-2 rounded-md text-[11px] font-mono"
+            style={{ background: 'var(--color-warn-bg)', color: 'var(--color-warn)', border: '1px solid var(--color-warn)' }}
+          >
+            <span className="font-bold mr-1.5">{teamAName}:</span>{validateA.warnings.join(' · ')}
+          </div>
+        )}
+        {!validateB.ok && (
+          <div
+            className="px-3 py-2 rounded-md text-[11px] font-mono"
+            style={{ background: 'var(--color-warn-bg)', color: 'var(--color-warn)', border: '1px solid var(--color-warn)' }}
+          >
+            <span className="font-bold mr-1.5">{teamBName}:</span>{validateB.warnings.join(' · ')}
+          </div>
+        )}
+
+        <div className="flex gap-2 mt-1">
+          <Btn variant="ghost"   size="md" full onClick={onCancel}>Cancel</Btn>
+          <Btn variant="primary" size="md" full onClick={onConfirm}>Override &amp; Continue</Btn>
+        </div>
       </div>
     </div>
   )

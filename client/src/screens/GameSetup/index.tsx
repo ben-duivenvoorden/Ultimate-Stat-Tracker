@@ -4,6 +4,7 @@ import { Chip } from '@/components/ui/Chip'
 import { Label } from '@/components/ui/Label'
 import { useGameStore } from '@/core/store'
 import { useSession } from '@/core/selectors'
+import { deriveGameState, deriveGameStatus } from '@/core/engine'
 import { MOCK_GAMES } from '@/core/data'
 import type { TeamId } from '@/core/types'
 
@@ -17,11 +18,17 @@ export default function GameSetup() {
   const [pullingTeam, setPullingTeam] = useState<TeamId | null>(null)
 
   const game = selectedId ? MOCK_GAMES.find(g => g.id === selectedId) : null
-  const hasSession = !!(game && session && session.gameConfig.id === game.id && session.rawLog.length > 0)
-  const isFinished = !!(hasSession && session?.rawLog.some(e => e.type === 'end-game'))
-  const isInProgressConfig = game?.status === 'in-progress'
-  const canResume = (hasSession || isInProgressConfig) && !isFinished
-  const skipPullPrompt = hasSession || isInProgressConfig
+
+  // Status and score are derived from the session — never carried as static config.
+  // Only the currently-selected game can have a session attached at any one time.
+  const liveSession = (game && session && session.gameConfig.id === game.id) ? session : null
+  const status      = deriveGameStatus(liveSession)
+  const liveScore   = liveSession ? deriveGameState(liveSession).score : null
+  const isFinished  = status === 'complete'
+  const canResume   = status === 'in-progress'
+  const skipPullPrompt = status !== 'scheduled'
+
+  const sessionGameId = session?.gameConfig.id ?? null
 
   return (
     <div className="h-full flex bg-bg text-content">
@@ -46,7 +53,11 @@ export default function GameSetup() {
         <div className="flex-1 overflow-y-auto">
           {MOCK_GAMES.map(g => {
             const isActive = selectedId === g.id
-            const isLive = g.status === 'in-progress'
+            const rowStatus = (sessionGameId === g.id) ? deriveGameStatus(session) : 'scheduled'
+            const isLive    = rowStatus === 'in-progress'
+            const isDone    = rowStatus === 'complete'
+            const chipColor = isLive ? 'var(--color-success)' : isDone ? 'var(--color-dim)' : 'var(--color-muted)'
+            const chipText  = isLive ? 'LIVE' : isDone ? 'DONE' : 'SCHED'
             return (
               <button
                 key={g.id}
@@ -59,9 +70,7 @@ export default function GameSetup() {
               >
                 <div className="text-sm font-semibold text-content mb-1.5">{g.name}</div>
                 <div className="flex items-center gap-2">
-                  <Chip color={isLive ? 'var(--color-success)' : 'var(--color-muted)'}>
-                    {isLive ? 'LIVE' : 'SCHED'}
-                  </Chip>
+                  <Chip color={chipColor}>{chipText}</Chip>
                   <Label>{g.scheduledTime}</Label>
                 </div>
               </button>
@@ -81,16 +90,16 @@ export default function GameSetup() {
           <>
             <div className="w-full max-w-sm bg-surf border border-border-2 rounded-xl p-5 text-center">
               <Label block className="mb-2">{game.name}</Label>
-              {game.status === 'in-progress' && game.score ? (
+              {liveScore ? (
                 <div className="flex items-center justify-center gap-6 my-3">
                   <div>
                     <div className="text-xs font-bold mb-1" style={{ color: game.teams.A.color }}>{game.teams.A.short}</div>
-                    <div className="text-5xl font-black text-content leading-none">{game.score.A}</div>
+                    <div className="text-5xl font-black text-content leading-none">{liveScore.A}</div>
                   </div>
                   <div className="text-muted text-xl">—</div>
                   <div>
                     <div className="text-xs font-bold mb-1" style={{ color: game.teams.B.color }}>{game.teams.B.short}</div>
-                    <div className="text-5xl font-black text-content leading-none">{game.score.B}</div>
+                    <div className="text-5xl font-black text-content leading-none">{liveScore.B}</div>
                   </div>
                 </div>
               ) : (
@@ -142,11 +151,7 @@ export default function GameSetup() {
                 </>
               ) : canResume ? (
                 <>
-                  <Btn
-                    variant="primary"
-                    size="lg"
-                    onClick={() => hasSession ? resumeGame(game.id) : selectGame(game.id, 'A')}
-                  >
+                  <Btn variant="primary" size="lg" onClick={() => resumeGame(game.id)}>
                     ▶  Continue Recording
                   </Btn>
                   <Btn variant="ghost" size="lg">Export</Btn>

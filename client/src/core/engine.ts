@@ -165,6 +165,17 @@ export function deriveGameState(session: GameSession): DerivedGameState {
   return state
 }
 
+// ─── Game status (also derived) ───────────────────────────────────────────────
+// status is purely a function of the rawLog — there is no static "this game is
+// in-progress" flag on GameConfig. A game is in-progress if any event has been
+// recorded; complete once an end-game event lands.
+
+export function deriveGameStatus(session: GameSession | null | undefined): import('./types').GameStatus {
+  if (!session || session.rawLog.length === 0) return 'scheduled'
+  if (session.rawLog.some(e => e.type === 'end-game')) return 'complete'
+  return 'in-progress'
+}
+
 // ─── Validation ───────────────────────────────────────────────────────────────
 // Single source of truth for "is this event allowed right now".
 // UI uses this to enable/disable controls; amend logic uses it to reject invalid

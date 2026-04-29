@@ -18,141 +18,138 @@ export default function GameSettings() {
         >
           ←
         </button>
-        <div>
+        <div className="flex-1">
           <Label block className="mb-0.5">RECORDING SETTINGS</Label>
           <div className="text-sm font-bold">Configure what events are tracked</div>
         </div>
+        <Btn variant="primary" size="md" onClick={closeGameSettings}>Done</Btn>
       </div>
 
-      {/* Settings body */}
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 max-w-lg">
+      {/* Settings body — 2-column landscape layout */}
+      <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 gap-4 auto-rows-min">
 
-        <SectionHeading>PULL PHASE</SectionHeading>
-        <SettingRow
-          label="Pull Bonus"
-          description="Track when a pull lands in the attacking end zone"
-          checked={options.pullBonus}
-          onChange={v => updateRecordingOption('pullBonus', v)}
-        />
+        <Section title="GAME MODE & LINE COMPOSITION">
+          <div className="flex gap-2">
+            <ModeButton
+              selected={options.gameMode === 'mixed'}
+              onClick={() => updateRecordingOption('gameMode', 'mixed')}
+            >Mixed</ModeButton>
+            <ModeButton
+              selected={options.gameMode === 'open'}
+              onClick={() => updateRecordingOption('gameMode', 'open')}
+            >Open</ModeButton>
+          </div>
+          {options.gameMode === 'open' ? (
+            <CompactStepper
+              label="Players per line"
+              value={options.lineRatio.M + options.lineRatio.F}
+              onChange={v => updateRecordingOption('lineRatio', { M: v, F: 0 })}
+              min={1}
+              max={9}
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              <CompactStepper
+                label="Male Matching"
+                value={options.lineRatio.M}
+                onChange={v => updateRecordingOption('lineRatio', { ...options.lineRatio, M: v })}
+                min={0}
+                max={9}
+              />
+              <CompactStepper
+                label="Female Matching"
+                value={options.lineRatio.F}
+                onChange={v => updateRecordingOption('lineRatio', { ...options.lineRatio, F: v })}
+                min={0}
+                max={9}
+              />
+            </div>
+          )}
+        </Section>
 
-        <SectionHeading>STOPPAGES</SectionHeading>
-        <SettingRow
-          label="Foul"
-          description="Record foul calls during play"
-          checked={options.foul}
-          onChange={v => updateRecordingOption('foul', v)}
-        />
-        <SettingRow
-          label="Pick"
-          description="Record pick violations during play"
-          checked={options.pick}
-          onChange={v => updateRecordingOption('pick', v)}
-        />
-
-        <SectionHeading>TURNOVERS</SectionHeading>
-        <SettingRow
-          label="Stall"
-          description="Record stall violations as a turnover"
-          checked={options.stall}
-          onChange={v => updateRecordingOption('stall', v)}
-        />
-
-        <SectionHeading>LINE COMPOSITION</SectionHeading>
-        <StepperRow
-          label="Male Matching"
-          description="Number of male-matching players per line"
-          value={options.lineRatio.M}
-          onChange={v => updateRecordingOption('lineRatio', { ...options.lineRatio, M: v })}
-          min={0}
-          max={9}
-        />
-        <StepperRow
-          label="Female Matching"
-          description="Number of female-matching players per line"
-          value={options.lineRatio.F}
-          onChange={v => updateRecordingOption('lineRatio', { ...options.lineRatio, F: v })}
-          min={0}
-          max={9}
-        />
-
-        <div
-          className="mt-4 px-3 py-2.5 rounded-lg text-[11px]"
-          style={{ background: 'var(--color-surf-2)', color: 'var(--color-muted)', border: '1px solid var(--color-border)' }}
-        >
-          These settings apply to all new games. In future, some options will be locked by the league or tournament.
-        </div>
+        <Section title="EVENTS">
+          <div className="flex flex-col gap-2">
+            <CompactToggle
+              label="Pull Bonus"
+              hint="End-zone pulls"
+              checked={options.pullBonus}
+              onChange={v => updateRecordingOption('pullBonus', v)}
+            />
+            <CompactToggle
+              label="Foul"
+              hint="Foul calls during play"
+              checked={options.foul}
+              onChange={v => updateRecordingOption('foul', v)}
+            />
+            <CompactToggle
+              label="Pick"
+              hint="Pick violations"
+              checked={options.pick}
+              onChange={v => updateRecordingOption('pick', v)}
+            />
+            <CompactToggle
+              label="Stall"
+              hint="Stall as turnover"
+              checked={options.stall}
+              onChange={v => updateRecordingOption('stall', v)}
+            />
+          </div>
+        </Section>
       </div>
 
-      <div className="flex-shrink-0 p-4 border-t border-border">
-        <Btn variant="primary" size="md" full onClick={closeGameSettings}>
-          Done
-        </Btn>
-      </div>
     </div>
   )
 }
 
 // ── Building blocks ────────────────────────────────────────────────────────────
 
-function SectionHeading({ children }: { children: string }) {
+function Section({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className="pt-2 pb-1">
-      <Label className="text-[9px]">{children}</Label>
+    <div
+      className={`rounded-lg border p-3 flex flex-col gap-2 ${className}`}
+      style={{ background: 'var(--color-surf)', borderColor: 'var(--color-border)' }}
+    >
+      <Label className="text-[9px]">{title}</Label>
+      {children}
     </div>
   )
 }
 
-interface SettingRowProps {
-  label:       string
-  description: string
-  checked:     boolean
-  onChange:    (v: boolean) => void
-}
-
-function SettingRow({ label, description, checked, onChange }: SettingRowProps) {
+function ModeButton({ children, selected, onClick }: { children: string; selected: boolean; onClick: () => void }) {
   return (
-    <div
-      className="flex items-center justify-between gap-4 px-3 py-3 rounded-lg border cursor-pointer"
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex-1 h-10 rounded-md border text-sm font-semibold transition-colors cursor-pointer"
       style={{
-        background:  checked ? 'var(--color-surf-2)' : 'transparent',
-        borderColor: checked ? 'var(--color-border-2)' : 'var(--color-border)',
+        background:  selected ? 'var(--color-team-a)' : 'transparent',
+        borderColor: selected ? 'transparent' : 'var(--color-border)',
+        color:       selected ? '#fff' : 'var(--color-muted)',
       }}
-      onClick={() => onChange(!checked)}
     >
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-content leading-none mb-1">{label}</div>
-        <div className="text-[11px]" style={{ color: 'var(--color-muted)' }}>{description}</div>
-      </div>
-      <Toggle checked={checked} />
-    </div>
+      {children}
+    </button>
   )
 }
 
-interface StepperRowProps {
-  label:       string
-  description: string
-  value:       number
-  min:         number
-  max:         number
-  onChange:    (v: number) => void
-}
-
-function StepperRow({ label, description, value, min, max, onChange }: StepperRowProps) {
+function CompactStepper({
+  label, value, min, max, onChange,
+}: {
+  label:    string
+  value:    number
+  min:      number
+  max:      number
+  onChange: (v: number) => void
+}) {
   return (
     <div
-      className="flex items-center justify-between gap-4 px-3 py-3 rounded-lg border"
-      style={{
-        background:  'var(--color-surf-2)',
-        borderColor: 'var(--color-border-2)',
-      }}
+      className="flex items-center justify-between gap-3 px-3 h-10 rounded-md border"
+      style={{ background: 'var(--color-surf-2)', borderColor: 'var(--color-border-2)' }}
     >
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-content leading-none mb-1">{label}</div>
-        <div className="text-[11px]" style={{ color: 'var(--color-muted)' }}>{description}</div>
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <span className="text-sm font-semibold text-content">{label}</span>
+      <div className="flex items-center gap-1.5 flex-shrink-0">
         <StepperButton onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min}>−</StepperButton>
-        <span className="w-6 text-center text-base font-bold tabular-nums">{value}</span>
+        <span className="w-5 text-center text-base font-bold tabular-nums">{value}</span>
         <StepperButton onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max}>+</StepperButton>
       </div>
     </div>
@@ -165,7 +162,7 @@ function StepperButton({ children, onClick, disabled }: { children: string; onCl
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="w-8 h-8 rounded-md border text-base font-bold cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-default"
+      className="w-7 h-7 rounded-md border text-base font-bold cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-default"
       style={{
         background:  'var(--color-surf-3)',
         borderColor: 'var(--color-border-2)',
@@ -177,17 +174,44 @@ function StepperButton({ children, onClick, disabled }: { children: string; onCl
   )
 }
 
+function CompactToggle({
+  label, hint, checked, onChange,
+}: {
+  label:    string
+  hint:     string
+  checked:  boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="flex items-center justify-between gap-2 px-3 py-2 rounded-md border cursor-pointer text-left"
+      style={{
+        background:  checked ? 'var(--color-surf-2)' : 'transparent',
+        borderColor: checked ? 'var(--color-border-2)' : 'var(--color-border)',
+      }}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold text-content leading-none mb-0.5">{label}</div>
+        <div className="text-[10px] truncate" style={{ color: 'var(--color-muted)' }}>{hint}</div>
+      </div>
+      <Toggle checked={checked} />
+    </button>
+  )
+}
+
 function Toggle({ checked }: { checked: boolean }) {
   return (
     <div
-      className="flex-shrink-0 w-10 h-6 rounded-full relative transition-colors duration-200"
+      className="flex-shrink-0 w-9 h-5 rounded-full relative transition-colors duration-200"
       style={{ background: checked ? 'var(--color-success)' : 'var(--color-surf-2)', border: '1px solid var(--color-border-2)' }}
     >
       <span
-        className="absolute top-0.5 w-5 h-5 rounded-full transition-transform duration-200"
+        className="absolute top-0.5 w-4 h-4 rounded-full transition-transform duration-200"
         style={{
           background: checked ? '#fff' : 'var(--color-dim)',
-          transform: checked ? 'translateX(18px)' : 'translateX(2px)',
+          transform: checked ? 'translateX(16px)' : 'translateX(2px)',
         }}
       />
     </div>

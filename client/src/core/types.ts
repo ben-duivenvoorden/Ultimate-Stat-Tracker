@@ -132,12 +132,16 @@ export type AppScreen = 'game-setup' | 'game-settings' | 'line-selection' | 'liv
 
 // ─── Recording options ────────────────────────────────────────────────────────
 
+export type GameMode = 'mixed' | 'open'
+
 export interface RecordingOptions {
   pullBonus: boolean
   foul:      boolean
   pick:      boolean
   stall:     boolean
-  /** Mixed-division line composition: M = male-matching, F = female-matching. */
+  /** 'mixed' = male/female-matching ratio enforced; 'open' = total count only. */
+  gameMode:  GameMode
+  /** In mixed: M and F counts must match. In open: M+F is the total line size. */
   lineRatio: { M: number; F: number }
 }
 
@@ -146,22 +150,22 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
   foul:      false,
   pick:      false,
   stall:     false,
+  gameMode:  'mixed',
   lineRatio: { M: 4, F: 3 },
 }
 
 // ─── Game config & session ────────────────────────────────────────────────────
 
+export type GameStatus = 'scheduled' | 'in-progress' | 'complete'
+
 export interface GameConfig {
   id: GameId
   name: string
   scheduledTime: string
-  status: 'scheduled' | 'in-progress' | 'complete'
-  score?: Score
   teams: Record<TeamId, Team>
   rosters: Record<TeamId, Player[]>
   halfTimeAt: number
   scoreCapAt: number
-  lineSize: number
 }
 
 export interface ActiveLine {

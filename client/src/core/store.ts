@@ -146,16 +146,27 @@ export const useGameStore = create<GameStore>()(
       // ── confirmLine ─────────────────────────────────────────────────────────
       // Confirms the line for a new point (or for an injury sub).
       // For new points, appends a 'point-start' event so gamePhase moves to awaiting-pull.
+      // Also appends a 'system' event listing the confirmed line-up for both teams so
+      // the recorder has an audit trail of who was on the field per point.
       confirmLine(lineA, lineB) {
         const { session, isInjurySub } = get()
         if (!session) return
 
         const newActiveLine = { A: lineA, B: lineB }
+        const teams = session.gameConfig.teams
+        const fmt = (team: 'A' | 'B', line: Player[]) =>
+          `${teams[team].short} line: ${line.map(p => p.name).join(', ')}`
 
         if (isInjurySub) {
-          // Mid-point injury: just update activeLine, don't append point-start
+          const state = deriveGameState(session)
+          const updated = appendEvents(
+            { ...session, activeLine: newActiveLine },
+            [
+              { ...baseRawEvent(state.pointIndex), type: 'system', text: `Injury sub — ${fmt('A', lineA)} | ${fmt('B', lineB)}` },
+            ],
+          )
           set({
-            session: { ...session, activeLine: newActiveLine },
+            session: updated,
             screen: 'live-entry',
             isInjurySub: false,
             uiMode: 'idle',
@@ -163,11 +174,15 @@ export const useGameStore = create<GameStore>()(
           return
         }
 
-        // Normal line confirmation: start the next point
+        // Normal line confirmation: start the next point and log the line-up.
         const state = deriveGameState(session)
         const updatedSession = appendEvents(
           { ...session, activeLine: newActiveLine },
-          [{ ...baseRawEvent(state.pointIndex), type: 'point-start' }],
+          [
+            { ...baseRawEvent(state.pointIndex), type: 'point-start' },
+            { ...baseRawEvent(state.pointIndex), type: 'system', text: fmt('A', lineA) },
+            { ...baseRawEvent(state.pointIndex), type: 'system', text: fmt('B', lineB) },
+          ],
         )
         set({
           session:   updatedSession,

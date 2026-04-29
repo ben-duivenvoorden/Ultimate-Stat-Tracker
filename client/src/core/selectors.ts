@@ -71,6 +71,7 @@ export function useRecordingOptions(): RecordingOptions {
   return {
     ...DEFAULT_RECORDING_OPTIONS,
     ...(stored ?? {}),
+    gameMode:  stored?.gameMode  ?? DEFAULT_RECORDING_OPTIONS.gameMode,
     lineRatio: stored?.lineRatio ?? DEFAULT_RECORDING_OPTIONS.lineRatio,
   }
 }
