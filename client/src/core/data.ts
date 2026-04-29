@@ -24,14 +24,14 @@ const BREEZE = team('B', 'DC Breeze', 'DCB', '#ff6640')
 
 const EMPIRE_ROSTER: Player[] = [
   player('a1', 'Matt Geyer', 'A', avatarUrl('MG', '#1f4788')),
-  player('a2', 'Kyle Weigand', 'A', avatarUrl('KW', '#4a9eff')),
-  player('a3', 'Brodie Smith', 'A', avatarUrl('BS', '#4a9eff')),
-  player('a4', 'Jimmy Mickle', 'A', avatarUrl('JM', '#4a9eff')),
-  player('a5', 'Ben Jagt', 'A', avatarUrl('BJ', '#4a9eff')),
-  player('a6', 'Chase Reznik', 'A', avatarUrl('CR', '#4a9eff')),
-  player('a7', 'David Pfeiffer', 'A', avatarUrl('DP', '#4a9eff')),
-  player('a8', 'Brannon Redmond', 'A', avatarUrl('BR', '#4a9eff')),
-  player('a9', 'Andrew Hull', 'A', avatarUrl('AH', '#4a9eff')),
+  player('a2', 'Kyle Weigand', 'A', avatarUrl('KW', '#1f4788')),
+  player('a3', 'Brodie Smith', 'A', avatarUrl('BS', '#1f4788')),
+  player('a4', 'Jimmy Mickle', 'A', avatarUrl('JM', '#1f4788')),
+  player('a5', 'Ben Jagt', 'A', avatarUrl('BJ', '#1f4788')),
+  player('a6', 'Chase Reznik', 'A', avatarUrl('CR', '#1f4788')),
+  player('a7', 'David Pfeiffer', 'A', avatarUrl('DP', '#1f4788')),
+  player('a8', 'Brannon Redmond', 'A', avatarUrl('BR', '#1f4788')),
+  player('a9', 'Andrew Hull', 'A', avatarUrl('AH', '#1f4788')),
 ]
 
 const BREEZE_ROSTER: Player[] = [
