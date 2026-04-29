@@ -43,12 +43,12 @@ interface GameStore {
   backToGameList:    () => void
 
   // Recording actions (all funnel through canRecord guards)
-  tapPlayer:           (player: Player) => void
-  recordPull:          (bonus?: boolean) => void
-  recordThrowAway:     () => void
-  recordReceiverError: () => void
-  recordGoal:          () => void
-  triggerDefBlock:     (type: 'block' | 'intercept') => void
+  tapPlayer:            (player: Player) => void
+  recordPull:           (bonus?: boolean) => void
+  recordThrowAway:      () => void
+  triggerReceiverError: () => void
+  recordGoal:           () => void
+  triggerDefBlock:      (type: 'block' | 'intercept') => void
   recordFoul:          () => void
   recordPick:          () => void
   recordStall:         () => void
@@ -196,6 +196,21 @@ export const useGameStore = create<GameStore>()(
           return
         }
 
+        // Receiver error pick: record the player who had the error
+        if (uiMode === 'receiver-error-pick') {
+          if (!canRecord(state, 'turnover-receiver-error')) return
+          set({
+            session: appendEvents(session, [{
+              ...baseRawEvent(state.pointIndex),
+              type:     'turnover-receiver-error',
+              playerId: player.id,
+              teamId:   state.possession,
+            }]),
+            uiMode: 'idle',
+          })
+          return
+        }
+
         // Awaiting pull: select / deselect puller
         if (state.gamePhase === 'awaiting-pull') {
           const { selPuller } = get()
@@ -256,20 +271,15 @@ export const useGameStore = create<GameStore>()(
         })
       },
 
-      // ── recordReceiverError ─────────────────────────────────────────────────
-      recordReceiverError() {
+      // ── triggerReceiverError ────────────────────────────────────────────────
+      triggerReceiverError() {
         const { session } = get()
         if (!session) return
         const state = deriveGameState(session)
         if (!canRecord(state, 'turnover-receiver-error') || !state.discHolder) return
-
         set({
-          session: appendEvents(session, [{
-            ...baseRawEvent(state.pointIndex),
-            type:     'turnover-receiver-error',
-            playerId: state.discHolder,
-            teamId:   state.possession,
-          }]),
+          uiMode: 'receiver-error-pick',
+          showEventMenu: false,
         })
       },
 

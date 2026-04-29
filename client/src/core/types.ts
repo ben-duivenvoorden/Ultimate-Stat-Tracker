@@ -123,6 +123,7 @@ export type UiMode =
   | 'idle'               // default — no special interaction in progress
   | 'block-pick'         // recorder tapped "Defensive Block", picking blocker
   | 'intercept-pick'     // recorder tapped "Defensive Intercept", picking interceptor
+  | 'receiver-error-pick' // recorder tapped "Receiver Error", picking player who had error
   | 'injury-pick'        // recorder tapped "Injury Sub", picking injured player
 
 export type AppScreen = 'game-setup' | 'game-settings' | 'line-selection' | 'live-entry'

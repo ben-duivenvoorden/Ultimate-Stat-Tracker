@@ -16,6 +16,7 @@ interface ActionPaneProps {
   onThrowAway:         () => void
   onReceiverError:     () => void
   onDefensiveBlock:    (t: 'block' | 'intercept') => void
+  onCancelPickMode:    () => void
   onGoal:              () => void
   onHalfTime:          () => void
   onEndGame:           () => void
@@ -36,6 +37,7 @@ export function ActionPane({
   recordingOptions,
   onRecordPull, onThrowAway, onReceiverError, onDefensiveBlock, onGoal,
   onHalfTime, onEndGame, onInjurySub, onStall, onFoul, onPick, onTimeout, onBackToGames,
+  onCancelPickMode,
   showEventMenu, setShowEventMenu,
   terminalProps,
 }: ActionPaneProps) {
@@ -46,9 +48,10 @@ export function ActionPane({
 
   const contextLabel =
     isPickMode
-      ? uiMode === 'injury-pick'    ? 'TAP INJURED PLAYER'
-      : uiMode === 'intercept-pick' ? `PICK INTERCEPTOR FROM ${defendingShort} · tap bg to cancel`
-      :                                `PICK BLOCKER FROM ${defendingShort} · tap bg to cancel`
+      ? uiMode === 'injury-pick'       ? 'TAP INJURED PLAYER'
+      : uiMode === 'receiver-error-pick' ? 'TAP PLAYER WHO HAD ERROR'
+      : uiMode === 'intercept-pick'   ? `PICK INTERCEPTOR FROM ${defendingShort}`
+      :                                  `PICK BLOCKER FROM ${defendingShort}`
     : isPullPhase
       ? selPullerName ? selPullerName.toUpperCase() : 'TAP PULLER FIRST'
     : discHolderName
@@ -77,7 +80,7 @@ export function ActionPane({
       {isTerminal ? (
         <TerminalPanel {...terminalProps} />
       ) : isPickMode ? (
-        <PickModePlaceholder uiMode={uiMode} />
+        <PickModePlaceholder uiMode={uiMode} defendingShort={defendingShort} onCancel={onCancelPickMode} />
       ) : isPullPhase ? (
         <div className="flex-1 p-1.5 flex flex-col gap-1.5">
           <ActionTile label="Pull"       variant="primary" disabled={!pullerSelected} onClick={() => onRecordPull(false)} />
@@ -195,15 +198,26 @@ function Separator({ children }: { children: string }) {
   )
 }
 
-function PickModePlaceholder({ uiMode }: { uiMode: UiMode }) {
-  const isInjury    = uiMode === 'injury-pick'
-  const isIntercept = uiMode === 'intercept-pick'
-  const color = isInjury    ? 'var(--color-warn)'
-              : isIntercept ? 'var(--color-intercept)'
-              :               'var(--color-block)'
-  const label = isInjury    ? 'Injury Sub'
-              : isIntercept ? 'Defensive Intercept'
-              :               'Defensive Block'
+function PickModePlaceholder({
+  uiMode,
+  defendingShort,
+  onCancel,
+}: {
+  uiMode: UiMode
+  defendingShort: string
+  onCancel: () => void
+}) {
+  const isInjury        = uiMode === 'injury-pick'
+  const isIntercept     = uiMode === 'intercept-pick'
+  const isReceiverError = uiMode === 'receiver-error-pick'
+  const color = isInjury        ? 'var(--color-warn)'
+              : isReceiverError ? 'var(--color-warn)'
+              : isIntercept     ? 'var(--color-intercept)'
+              :                   'var(--color-block)'
+  const label = isInjury        ? 'Injury Sub'
+              : isReceiverError ? 'Receiver Error'
+              : isIntercept     ? 'Defensive Intercept'
+              :                   'Defensive Block'
 
   return (
     <div className="flex-1 p-1.5 flex flex-col gap-1.5">
@@ -213,6 +227,10 @@ function PickModePlaceholder({ uiMode }: { uiMode: UiMode }) {
       >
         {label}
       </div>
+      <div className="flex-1" />
+      <Btn variant="ghost" size="sm" full onClick={onCancel}>
+        Cancel
+      </Btn>
     </div>
   )
 }

@@ -170,7 +170,7 @@ export default function LiveEntry() {
             recordingOptions={recordingOptions}
             onRecordPull={actions.recordPull}
             onThrowAway={actions.recordThrowAway}
-            onReceiverError={actions.recordReceiverError}
+            onReceiverError={actions.triggerReceiverError}
             onDefensiveBlock={actions.triggerDefBlock}
             onGoal={actions.recordGoal}
             onHalfTime={actions.triggerHalfTime}
@@ -181,6 +181,7 @@ export default function LiveEntry() {
             onPick={actions.recordPick}
             onTimeout={actions.recordTimeout}
             onBackToGames={actions.backToGameList}
+            onCancelPickMode={actions.cancelPickMode}
             showEventMenu={ui.showEventMenu}
             setShowEventMenu={actions.setShowEventMenu}
             terminalProps={terminalProps}
