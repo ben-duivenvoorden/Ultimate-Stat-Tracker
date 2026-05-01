@@ -26,5 +26,10 @@ client/src/
 
 ## Pending changes workflow
 
-Queue feature requests in `docs/_New Changes/New Changes.md`.
-Run `/new-changes` to implement them.
+Queue feature requests by adding files to `docs/_get_changes/`. The default
+queue file is `Get Changes.md`; you can also drop in additional files (notes,
+sketches, mock data) and they'll all be picked up.
+
+Run `/get-changes` to implement everything queued — the skill reads every
+file in the directory, deletes them all, recreates an empty `Get Changes.md`
+placeholder, and then implements the captured changes.
