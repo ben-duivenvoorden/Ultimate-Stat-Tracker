@@ -10,7 +10,7 @@ export const CHIP_H = 22
 export const CENTER_K = 0.9
 // Soft repulsion only kicks in when pill-to-pill clearance is below
 // REPULSE_R px. Smaller = pills allowed to sit closer before pushing apart.
-export const REPULSE_R = 24
+export const REPULSE_R = 30
 export const REPULSE_K = 500
 // Friction here is the per-frame velocity multiplier (0 = stop instantly,
 // 1 = no damping). 0.65 means 35% of velocity decays each frame, which kills
