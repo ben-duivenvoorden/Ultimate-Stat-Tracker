@@ -134,7 +134,10 @@ export function initialPositions(n: number, w: number, h: number): Vec[] {
 
 export interface PhysicsStepInput {
   positions:  Vec[]
-  names:      string[]
+  /** Per-pill half-width (px) — measured from the rendered DOM where
+   *  available, falling back to the heuristic. Drives both pairwise
+   *  repulsion strength and the hard non-overlap constraint. */
+  halfWidths: number[]
   dt:         number
   centre:     { x: number; y: number }
   bounds:     { w: number; h: number }
@@ -146,10 +149,11 @@ export interface PhysicsStepInput {
 // One physics tick. Mutates `positions` in place. Pure function of inputs:
 // no DOM, no module state, safe for unit tests.
 export function stepPhysics(input: PhysicsStepInput): void {
-  const { positions, names, dt, centre, bounds, drag, open, openChips } = input
+  const { positions, halfWidths, dt, centre, bounds, drag, open, openChips } = input
   const cx = centre.x, cy = centre.y
   const { w, h } = bounds
 
+  // ─── Forces + integration ────────────────────────────────────────────────
   for (let i = 0; i < positions.length; i++) {
     if (i === drag || i === open) continue
     const p = positions[i]
@@ -158,18 +162,34 @@ export function stepPhysics(input: PhysicsStepInput): void {
     p.vx += (cx - p.x) * CENTER_K * dt
     p.vy += (cy - p.y) * CENTER_K * dt
 
-    // Pairwise repulsion
+    // AABB-aware pairwise repulsion. Strength scales with how close the
+    // rect-to-rect clearance is. Pills further apart than REPULSE_R clearance
+    // get nothing; touching (or overlapping) get the full push.
+    const hwI = halfWidths[i]
     for (let j = 0; j < positions.length; j++) {
       if (j === i) continue
       const q = positions[j]
       const dx = p.x - q.x
       const dy = p.y - q.y
-      const d2 = dx * dx + dy * dy
-      if (d2 < REPULSE_R * REPULSE_R && d2 > 0.01) {
-        const d = Math.sqrt(d2)
-        const f = (REPULSE_R - d) / REPULSE_R
-        p.vx += (dx / d) * f * REPULSE_K * dt
-        p.vy += (dy / d) * f * REPULSE_K * dt
+      const adx = Math.abs(dx)
+      const ady = Math.abs(dy)
+      // Centre-to-centre minimum distances at which the rects would just touch.
+      const minDx = hwI + halfWidths[j]
+      const minDy = 2 * HH
+      // Clearance (>=0 when rects don't overlap).
+      const cxClear = Math.max(0, adx - minDx)
+      const cyClear = Math.max(0, ady - minDy)
+      // Use Euclidean clearance as a single proximity scalar; if either axis
+      // overlaps we treat that axis's clearance as 0 (rects are interpenetrating
+      // along that axis), so the proximity is dominated by the other axis.
+      const proximity = Math.hypot(cxClear, cyClear)
+      if (proximity < REPULSE_R) {
+        const f = (REPULSE_R - proximity) / REPULSE_R
+        // Direction: from q toward p along their centre offset (use a small
+        // epsilon to avoid the zero-vector case).
+        const distC = Math.max(0.5, Math.hypot(dx, dy))
+        p.vx += (dx / distC) * f * REPULSE_K * dt
+        p.vy += (dy / distC) * f * REPULSE_K * dt
       }
     }
 
@@ -190,15 +210,53 @@ export function stepPhysics(input: PhysicsStepInput): void {
     if (p.y > h - BOUNDS_MARGIN) { p.y = h - BOUNDS_MARGIN; p.vy *= -0.3 }
   }
 
-  // Positional push-out from the open pill's chip footprint.
+  // ─── Hard non-overlap constraint ─────────────────────────────────────────
+  // Position-correction pass: for any pair whose rects overlap, push them
+  // apart by half the smaller-axis overlap each. Skip the dragged pill (the
+  // user owns its position) — push only the other pill in such a pair.
+  for (let i = 0; i < positions.length; i++) {
+    for (let j = i + 1; j < positions.length; j++) {
+      const a = positions[i]
+      const b = positions[j]
+      const dx = a.x - b.x
+      const dy = a.y - b.y
+      const minDx = halfWidths[i] + halfWidths[j] + BUFFER
+      const minDy = 2 * HH + BUFFER
+      const ox = minDx - Math.abs(dx)
+      const oy = minDy - Math.abs(dy)
+      if (ox > 0 && oy > 0) {
+        const aLocked = i === drag
+        const bLocked = j === drag
+        if (ox < oy) {
+          const sgn = dx >= 0 ? 1 : -1
+          if (aLocked && !bLocked)      { b.x -= sgn * ox; b.vx = 0 }
+          else if (bLocked && !aLocked) { a.x += sgn * ox; a.vx = 0 }
+          else {
+            a.x += sgn * (ox / 2); a.vx = 0
+            b.x -= sgn * (ox / 2); b.vx = 0
+          }
+        } else {
+          const sgn = dy >= 0 ? 1 : -1
+          if (aLocked && !bLocked)      { b.y -= sgn * oy; b.vy = 0 }
+          else if (bLocked && !aLocked) { a.y += sgn * oy; a.vy = 0 }
+          else {
+            a.y += sgn * (oy / 2); a.vy = 0
+            b.y -= sgn * (oy / 2); b.vy = 0
+          }
+        }
+      }
+    }
+  }
+
+  // ─── Open-pill chip-zone push-out ────────────────────────────────────────
   if (open >= 0 && openChips.length > 0) {
     const o = positions[open]
-    const ohw = pillHalfWidth(names[open])
+    const ohw = halfWidths[open]
     const rects = openZoneRects(o.x, o.y, ohw, openChips)
     for (let i = 0; i < positions.length; i++) {
       if (i === drag || i === open) continue
       const p = positions[i]
-      const phw = pillHalfWidth(names[i])
+      const phw = halfWidths[i]
       const pl = p.x - phw - BUFFER, pr = p.x + phw + BUFFER
       const pt = p.y - HH - BUFFER,  pb = p.y + HH + BUFFER
       for (const rc of rects) {

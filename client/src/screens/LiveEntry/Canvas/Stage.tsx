@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Player, PlayerId } from '@/core/types'
 import { TAP_THRESH, HH } from './constants'
 import {
@@ -54,9 +54,17 @@ export function Stage(props: StageProps) {
     nodeRefs.current = Array.from({ length: N }, () => null)
   }
 
+  // Per-pill measured half-width (px). Seeded with the heuristic so physics
+  // works on the first frame; PlayerNode replaces these via onMeasureWidth.
+  const halfWidthsRef = useRef<number[]>([])
+  if (halfWidthsRef.current.length !== N) {
+    halfWidthsRef.current = props.players.map(p => pillHalfWidth(p.name))
+  }
+
   // Initial positions on mount / when team-id changes (parent re-keys Stage).
   useLayoutEffect(() => {
     posRef.current = initialPositions(N, props.bounds.w, props.bounds.h)
+    halfWidthsRef.current = props.players.map(p => pillHalfWidth(p.name))
     applyDOM()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [N, props.teamId])
@@ -75,37 +83,38 @@ export function Stage(props: StageProps) {
 
   const dragInfo = useRef({ idx: -1, offX: 0, offY: 0, startX: 0, startY: 0, moved: false })
 
-  // Chips for the currently open pill.
-  const openChips = useMemo<ChipSpec[]>(() => {
-    if (openIdx < 0) return []
-    const player = props.players[openIdx]
-    if (!player) return []
+  // Compute the chip set per pill. Always non-empty for pills that *could*
+  // be opened (holder in in-play, puller in awaiting-pull) so the chips are
+  // already mounted (invisible) and can transition in when isOpen flips.
+  const chipsForPlayer = (player: Player): ChipSpec[] => {
     if (props.mode === 'pick') return []
+    const idx = props.players.indexOf(player)
+    const HW = idx >= 0 ? halfWidthsRef.current[idx] : pillHalfWidth(player.name)
     if (props.mode === 'awaiting-pull') {
       if (player.id !== props.pullerId) return []
-      const HW = pillHalfWidth(player.name)
       return buildActions(HW, { phase: 'awaiting-pull', bonusShown: props.bonusShown })
     }
     if (player.id !== props.holderId) return []
-    const HW = pillHalfWidth(player.name)
     return buildActions(HW, { phase: 'in-play', stallShown: props.stallShown })
-  }, [openIdx, props.mode, props.players, props.holderId, props.pullerId, props.stallShown, props.bonusShown])
+  }
+
+  // Chips for whichever pill is currently open — handed to physics so chip
+  // rects participate in push-out. Recomputed each render off the latest
+  // measured widths.
+  const openPlayer = openIdx >= 0 ? props.players[openIdx] : null
+  const openChips: ChipSpec[] = openPlayer ? chipsForPlayer(openPlayer) : []
 
   // Latest-props ref so the rAF loop sees current centre/bounds without restarting.
   const tickCtx = useRef({
     centre: props.centre,
     bounds: props.bounds,
-    names:  props.players.map(p => p.name),
     arrows: props.arrows,
-    teamColor: props.teamColor,
     openChips,
   })
   tickCtx.current = {
     centre: props.centre,
     bounds: props.bounds,
-    names:  props.players.map(p => p.name),
     arrows: props.arrows,
-    teamColor: props.teamColor,
     openChips,
   }
 
@@ -131,14 +140,14 @@ export function Stage(props: StageProps) {
       const ctx = tickCtx.current
 
       stepPhysics({
-        positions: posRef.current,
-        names:     ctx.names,
+        positions:  posRef.current,
+        halfWidths: halfWidthsRef.current,
         dt,
-        centre:    ctx.centre,
-        bounds:    ctx.bounds,
-        drag:      stateRef.current.dragIdx,
-        open:      stateRef.current.openIdx,
-        openChips: ctx.openChips,
+        centre:     ctx.centre,
+        bounds:     ctx.bounds,
+        drag:       stateRef.current.dragIdx,
+        open:       stateRef.current.openIdx,
+        openChips:  ctx.openChips,
       })
 
       // Update pass arrows (recent at slot 0, previous at slot 1).
@@ -157,8 +166,8 @@ export function Stage(props: StageProps) {
         const a = posRef.current[pass.fromIdx]
         const b = posRef.current[pass.toIdx]
         if (!a || !b) continue
-        const halfA = { hw: pillHalfWidth(ctx.names[pass.fromIdx]), hh: HH }
-        const halfB = { hw: pillHalfWidth(ctx.names[pass.toIdx]),   hh: HH }
+        const halfA = { hw: halfWidthsRef.current[pass.fromIdx], hh: HH }
+        const halfB = { hw: halfWidthsRef.current[pass.toIdx],   hh: HH }
         const geom = computeArrowPath(a.x, a.y, b.x, b.y, halfA, halfB)
         slot.path.setAttribute('d', geom.d)
         slot.path.setAttribute('opacity', k === 0 ? '1' : '0.35')
@@ -286,11 +295,12 @@ export function Stage(props: StageProps) {
             isOpen={isOpen}
             dragging={dragging}
             ineligible={ineligible}
-            chips={isOpen ? openChips : []}
+            chips={chipsForPlayer(p)}
             onMouseDown={(e) => { if (!ineligible) beginDrag(i, e) }}
             onTouchStart={(e) => { if (!ineligible) beginDrag(i, e) }}
             onClick={onPillClick(i)}
             onChipClick={(id) => onChipTap(p, id)}
+            onMeasureWidth={(hw) => { halfWidthsRef.current[i] = hw }}
           />
         )
       })}

@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, useEffect, useRef } from 'react'
 import { PILL_H } from './constants'
 import { pillLabel, type ChipSpec } from './physics'
 import { ActionChip } from './ActionChip'
@@ -14,11 +14,17 @@ interface PlayerNodeProps {
   isOpen: boolean
   dragging: boolean
   ineligible: boolean
+  /** Always-mounted chip set for this pill (driven by holder/puller status,
+   *  empty otherwise). Visibility is governed by `isOpen` so the CSS
+   *  transition can run from invisible→visible when the pill is opened. */
   chips: ChipSpec[]
   onMouseDown: (e: React.MouseEvent) => void
   onTouchStart: (e: React.TouchEvent) => void
   onClick: (e: React.MouseEvent) => void
   onChipClick: (id: ChipId) => void
+  /** Reports the rendered pill's half-width so physics can use real metrics
+   *  rather than a font-based heuristic. */
+  onMeasureWidth: (halfWidth: number) => void
 }
 
 // Fill colour for a chip — derives from the action category. The chip-category
@@ -50,9 +56,28 @@ function chipIdToVisType(id: ChipId): VisLogEntry['type'] | null {
 
 export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function PlayerNode(
   { name, teamColor, isHolder, isPuller, isOpen, dragging, ineligible, chips,
-    onMouseDown, onTouchStart, onClick, onChipClick }, ref,
+    onMouseDown, onTouchStart, onClick, onChipClick, onMeasureWidth }, ref,
 ) {
   const display = pillLabel(name)
+  const pillRef = useRef<HTMLDivElement | null>(null)
+
+  // Measure the rendered pill width and report up. Using useEffect (not
+  // useLayoutEffect) avoids a layout thrash; physics tolerates a one-frame
+  // delay before the measured width replaces the heuristic.
+  useEffect(() => {
+    if (!pillRef.current) return
+    const measure = () => {
+      const el = pillRef.current
+      if (!el) return
+      const w = el.offsetWidth
+      if (w > 0) onMeasureWidth(w / 2)
+    }
+    measure()
+    // Re-measure if the pill resizes (e.g. font metrics ready, name changes).
+    const ro = new ResizeObserver(measure)
+    ro.observe(pillRef.current)
+    return () => ro.disconnect()
+  }, [name, onMeasureWidth])
 
   // Background / border by state. Holder = thicker border + fuller fill.
   const bg =
@@ -83,13 +108,14 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
           label={a.label || CHIP_LABELS[a.id as ChipId]}
           ax={a.ax} ay={a.ay} align={a.align}
           visible={isOpen}
-          delay={i * 24}
+          delay={isOpen ? i * 28 : 0}
           fill={chipFill(a.id as ChipId)}
           accent={chipAccent(a.id as ChipId)}
           onTap={onChipClick}
         />
       ))}
       <div
+        ref={pillRef}
         onMouseDown={onMouseDown}
         onTouchStart={onTouchStart}
         onClick={onClick}
