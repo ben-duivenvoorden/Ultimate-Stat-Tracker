@@ -52,5 +52,7 @@ export const ARROW_REPEL_K = 900
 export const SWEEP_DURATION_MS = 400
 export const SWEEP_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)'
 
-// Soft bounds inset
-export const BOUNDS_MARGIN = 30
+// Soft bounds inset — distance kept clear between the pill (or chip
+// footprint) and the canvas edge. Smaller value = pills land closer to
+// the screen borders.
+export const BOUNDS_MARGIN = 15
