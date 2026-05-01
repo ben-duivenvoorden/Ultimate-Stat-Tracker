@@ -13,24 +13,21 @@ interface DrawerProps {
 
 const RAIL_W = 28
 
-// A fixed-position drawer that lives above the canvas. Collapsed = a thin rail
-// with an icon + chevron; expanded = full panel that overlays the canvas.
-// Physics inside the canvas is *not* constrained by drawer state — pills can
-// drift behind. The parent shifts the canvas's logical centre to compensate.
+// A flex-sibling drawer that sits beside the canvas. Collapsed = a thin rail
+// with an icon + chevron; expanded = full panel reserving its own width so the
+// canvas shrinks to fill the rest. Drawers therefore *push* the canvas rather
+// than overlap it; the canvas physics treats the smaller area as its bounds.
 export function Drawer({ side, expanded, width, rail, children, onToggle }: DrawerProps) {
   const isLeft = side === 'left'
   return (
     <div
       style={{
-        position: 'absolute',
-        top: 0, bottom: 0,
-        [isLeft ? 'left' : 'right']: 0,
+        flexShrink: 0,
         width: expanded ? width : RAIL_W,
         transition: `width 220ms ease-in-out`,
         background: 'var(--color-surf)',
         borderLeft:  isLeft  ? 'none' : '1px solid var(--color-border)',
         borderRight: isLeft  ? '1px solid var(--color-border)' : 'none',
-        zIndex: 20,
         display: 'flex',
         flexDirection: 'row',
         overflow: 'hidden',

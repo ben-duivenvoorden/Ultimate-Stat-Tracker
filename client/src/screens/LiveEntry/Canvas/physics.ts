@@ -202,80 +202,117 @@ export function stepPhysics(input: PhysicsStepInput): void {
     // Integrate
     p.x += p.vx * dt * 60
     p.y += p.vy * dt * 60
-
-    // Soft viewport bounds
-    if (p.x < BOUNDS_MARGIN)     { p.x = BOUNDS_MARGIN;     p.vx *= -0.3 }
-    if (p.x > w - BOUNDS_MARGIN) { p.x = w - BOUNDS_MARGIN; p.vx *= -0.3 }
-    if (p.y < BOUNDS_MARGIN)     { p.y = BOUNDS_MARGIN;     p.vy *= -0.3 }
-    if (p.y > h - BOUNDS_MARGIN) { p.y = h - BOUNDS_MARGIN; p.vy *= -0.3 }
   }
 
-  // ─── Hard non-overlap constraint ─────────────────────────────────────────
-  // Position-correction pass: for any pair whose rects overlap, push them
-  // apart by half the smaller-axis overlap each. Skip the dragged pill (the
-  // user owns its position) — push only the other pill in such a pair.
-  for (let i = 0; i < positions.length; i++) {
-    for (let j = i + 1; j < positions.length; j++) {
-      const a = positions[i]
-      const b = positions[j]
-      const dx = a.x - b.x
-      const dy = a.y - b.y
-      const minDx = halfWidths[i] + halfWidths[j] + BUFFER
-      const minDy = 2 * HH + BUFFER
-      const ox = minDx - Math.abs(dx)
-      const oy = minDy - Math.abs(dy)
-      if (ox > 0 && oy > 0) {
-        const aLocked = i === drag
-        const bLocked = j === drag
-        if (ox < oy) {
-          const sgn = dx >= 0 ? 1 : -1
-          if (aLocked && !bLocked)      { b.x -= sgn * ox; b.vx = 0 }
-          else if (bLocked && !aLocked) { a.x += sgn * ox; a.vx = 0 }
-          else {
-            a.x += sgn * (ox / 2); a.vx = 0
-            b.x -= sgn * (ox / 2); b.vx = 0
-          }
-        } else {
-          const sgn = dy >= 0 ? 1 : -1
-          if (aLocked && !bLocked)      { b.y -= sgn * oy; b.vy = 0 }
-          else if (bLocked && !aLocked) { a.y += sgn * oy; a.vy = 0 }
-          else {
-            a.y += sgn * (oy / 2); a.vy = 0
-            b.y -= sgn * (oy / 2); b.vy = 0
+  // ─── Constraint resolution (iterative) ───────────────────────────────────
+  // Three constraints all need to hold every frame:
+  //   1. No two pills overlap (rects + BUFFER apart).
+  //   2. Every pill's footprint stays inside the canvas.
+  //   3. Other pills don't sit inside the open pill's chip zone.
+  // Each constraint pass can violate the others when pushing things around,
+  // so iterate a few times until they converge. This is a position-only
+  // (Gauss-Seidel-ish) projection; velocities are zeroed where appropriate
+  // so the spring doesn't fight the corrections next frame.
+  const ITER = 4
+  for (let iter = 0; iter < ITER; iter++) {
+    // (1) Pairwise non-overlap.
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = i + 1; j < positions.length; j++) {
+        const a = positions[i]
+        const b = positions[j]
+        const dx = a.x - b.x
+        const dy = a.y - b.y
+        const minDx = halfWidths[i] + halfWidths[j] + BUFFER
+        const minDy = 2 * HH + BUFFER
+        const ox = minDx - Math.abs(dx)
+        const oy = minDy - Math.abs(dy)
+        if (ox > 0 && oy > 0) {
+          const aLocked = i === drag
+          const bLocked = j === drag
+          if (ox < oy) {
+            const sgn = dx >= 0 ? 1 : -1
+            if (aLocked && !bLocked)      { b.x -= sgn * ox; b.vx = 0 }
+            else if (bLocked && !aLocked) { a.x += sgn * ox; a.vx = 0 }
+            else {
+              a.x += sgn * (ox / 2); a.vx = 0
+              b.x -= sgn * (ox / 2); b.vx = 0
+            }
+          } else {
+            const sgn = dy >= 0 ? 1 : -1
+            if (aLocked && !bLocked)      { b.y -= sgn * oy; b.vy = 0 }
+            else if (bLocked && !aLocked) { a.y += sgn * oy; a.vy = 0 }
+            else {
+              a.y += sgn * (oy / 2); a.vy = 0
+              b.y -= sgn * (oy / 2); b.vy = 0
+            }
           }
         }
       }
     }
-  }
 
-  // ─── Open-pill chip-zone push-out ────────────────────────────────────────
-  if (open >= 0 && openChips.length > 0) {
-    const o = positions[open]
-    const ohw = halfWidths[open]
-    const rects = openZoneRects(o.x, o.y, ohw, openChips)
-    for (let i = 0; i < positions.length; i++) {
-      if (i === drag || i === open) continue
-      const p = positions[i]
-      const phw = halfWidths[i]
-      const pl = p.x - phw - BUFFER, pr = p.x + phw + BUFFER
-      const pt = p.y - HH - BUFFER,  pb = p.y + HH + BUFFER
-      for (const rc of rects) {
-        const ox = Math.min(pr, rc.r) - Math.max(pl, rc.l)
-        const oy = Math.min(pb, rc.b) - Math.max(pt, rc.t)
-        if (ox > 0 && oy > 0) {
-          const rcx = (rc.l + rc.r) / 2
-          const rcy = (rc.t + rc.b) / 2
-          if (oy < ox) {
-            const sgn = p.y === rcy ? 1 : Math.sign(p.y - rcy)
-            p.y += sgn * oy
-            if (Math.sign(p.vy) !== sgn && p.vy !== 0) p.vy = 0
-          } else {
-            const sgn = p.x === rcx ? 1 : Math.sign(p.x - rcx)
-            p.x += sgn * ox
-            if (Math.sign(p.vx) !== sgn && p.vx !== 0) p.vx = 0
+    // (2) Open-pill chip-zone push-out (other pills only).
+    if (open >= 0 && openChips.length > 0) {
+      const o = positions[open]
+      const ohw = halfWidths[open]
+      const rects = openZoneRects(o.x, o.y, ohw, openChips)
+      for (let i = 0; i < positions.length; i++) {
+        if (i === drag || i === open) continue
+        const p = positions[i]
+        const phw = halfWidths[i]
+        const pl = p.x - phw - BUFFER, pr = p.x + phw + BUFFER
+        const pt = p.y - HH - BUFFER,  pb = p.y + HH + BUFFER
+        for (const rc of rects) {
+          const ox = Math.min(pr, rc.r) - Math.max(pl, rc.l)
+          const oy = Math.min(pb, rc.b) - Math.max(pt, rc.t)
+          if (ox > 0 && oy > 0) {
+            const rcx = (rc.l + rc.r) / 2
+            const rcy = (rc.t + rc.b) / 2
+            if (oy < ox) {
+              const sgn = p.y === rcy ? 1 : Math.sign(p.y - rcy)
+              p.y += sgn * oy
+              if (Math.sign(p.vy) !== sgn && p.vy !== 0) p.vy = 0
+            } else {
+              const sgn = p.x === rcx ? 1 : Math.sign(p.x - rcx)
+              p.x += sgn * ox
+              if (Math.sign(p.vx) !== sgn && p.vx !== 0) p.vx = 0
+            }
           }
         }
       }
+    }
+
+    // (3) Visible-bounds clamp (pill + open chip footprint stay on canvas).
+    for (let i = 0; i < positions.length; i++) {
+      const p = positions[i]
+      const hw = halfWidths[i]
+      let minX = hw + BOUNDS_MARGIN
+      let maxX = w - hw - BOUNDS_MARGIN
+      let minY = HH + BOUNDS_MARGIN
+      let maxY = h - HH - BOUNDS_MARGIN
+
+      if (i === open && openChips.length > 0) {
+        const rects = openZoneRects(0, 0, hw, openChips)
+        let extLeft = hw, extRight = hw, extTop = HH, extBottom = HH
+        for (const r of rects) {
+          if (-r.l > extLeft)   extLeft   = -r.l
+          if ( r.r > extRight)  extRight  =  r.r
+          if (-r.t > extTop)    extTop    = -r.t
+          if ( r.b > extBottom) extBottom =  r.b
+        }
+        minX = extLeft + BOUNDS_MARGIN
+        maxX = w - extRight - BOUNDS_MARGIN
+        minY = extTop + BOUNDS_MARGIN
+        maxY = h - extBottom - BOUNDS_MARGIN
+      }
+
+      // Guard against negative ranges (canvas smaller than the footprint).
+      if (minX > maxX) minX = maxX = (minX + maxX) / 2
+      if (minY > maxY) minY = maxY = (minY + maxY) / 2
+
+      if (p.x < minX) { p.x = minX; if (p.vx < 0) p.vx = 0 }
+      if (p.x > maxX) { p.x = maxX; if (p.vx > 0) p.vx = 0 }
+      if (p.y < minY) { p.y = minY; if (p.vy < 0) p.vy = 0 }
+      if (p.y > maxY) { p.y = maxY; if (p.vy > 0) p.vy = 0 }
     }
   }
 }

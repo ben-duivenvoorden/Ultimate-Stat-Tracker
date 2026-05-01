@@ -33,7 +33,10 @@ interface PlayerNodeProps {
 function chipFill(id: ChipId): string {
   const type = chipIdToVisType(id)
   const color = type ? getVisLogColor(type) : 'var(--color-muted)'
-  return `color-mix(in srgb, ${color} 16%, transparent)`
+  // 28% colored fill keeps the chip body legible while still letting pass
+  // arrows passing beneath read through. ActionChip layers a slight overall
+  // 0.95 opacity on top.
+  return `color-mix(in srgb, ${color} 28%, transparent)`
 }
 
 function chipAccent(id: ChipId): string {
@@ -127,7 +130,12 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
           border: `${borderWidth}px ${borderStyle} ${borderColor}`,
           background: bg,
           color: ineligible ? 'var(--color-dim)' : 'var(--color-content)',
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          // `width: max-content` + flex makes the pill grow/shrink to its
+          // label. Plain `inline-flex` on an absolutely-positioned element
+          // can collapse to zero width, which is why the static heuristic
+          // (and any measurement based off that DOM node) fell over before.
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 'max-content',
           position: 'absolute', left: 0, top: 0,
           transform: dragging
             ? 'translate(-50%, -50%) scale(1.06)'

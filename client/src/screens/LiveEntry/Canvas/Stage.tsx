@@ -75,11 +75,21 @@ export function Stage(props: StageProps) {
   stateRef.current.openIdx = openIdx
   stateRef.current.dragIdx = dragIdx
 
-  // Reset open state when the mode changes (e.g. entering pick mode while
-  // staying on the same team). Team changes already remount Stage via the
-  // parent's key prop, so they reset openIdx implicitly.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setOpenIdx(-1) }, [props.mode])
+  // Auto-open the action chips on whichever pill is the current holder
+  // (in-play) or selected puller (awaiting-pull). This makes the chips
+  // "explode" immediately upon selection — the user doesn't need a second
+  // tap to access actions. If the role becomes null (dead disc / no puller
+  // selected) or the mode changes (e.g. entering pick mode), close the chips.
+  useEffect(() => {
+    let idx = -1
+    if (props.mode === 'in-play' && props.holderId !== null) {
+      idx = props.players.findIndex(p => p.id === props.holderId)
+    } else if (props.mode === 'awaiting-pull' && props.pullerId !== null) {
+      idx = props.players.findIndex(p => p.id === props.pullerId)
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOpenIdx(idx)
+  }, [props.mode, props.holderId, props.pullerId, props.players])
 
   const dragInfo = useRef({ idx: -1, offX: 0, offY: 0, startX: 0, startY: 0, moved: false })
 

@@ -4,15 +4,21 @@ export const HH = PILL_H / 2
 export const GAP = 6
 export const CHIP_H = 22
 
-// Physics — calmer than the reference design (was 2.6 / 150 / 1400 / 0.82).
-export const CENTER_K = 1.6
-export const REPULSE_R = 120
-export const REPULSE_K = 900
-export const FRICTION = 0.88
+// Physics. Tuned for an overdamped settle — pills approach equilibrium
+// without any oscillation / bounce-back. The reference values were
+// 2.6 / 150 / 1400 / 0.82.
+export const CENTER_K = 0.9
+export const REPULSE_R = 110
+export const REPULSE_K = 500
+// Friction here is the per-frame velocity multiplier (0 = stop instantly,
+// 1 = no damping). 0.65 means 35% of velocity decays each frame, which kills
+// any momentum within ~6 frames (≈100ms at 60fps).
+export const FRICTION = 0.65
 // Tap vs drag distinction (px). Bumped from 5 to forgive thumb shake.
 export const TAP_THRESH = 6
-// Velocities below this each frame snap to zero so pills come visibly to rest.
-export const MIN_SPEED = 0.4
+// Velocities below this each frame snap to zero. With heavy friction the
+// snap rarely matters, but it eliminates any sub-pixel jitter at rest.
+export const MIN_SPEED = 1.5
 
 // Open-pill push-out + arrow repulsion
 export const BUFFER = 12

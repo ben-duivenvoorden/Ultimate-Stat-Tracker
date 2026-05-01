@@ -38,8 +38,9 @@ export function formatVisLogEntry(entry: VisLogEntry, players: Player[]): string
 export function getVisLogColor(type: VisLogEntry['type']): string {
   switch (type) {
     case 'pull':
-    case 'pull-bonus':
       return 'var(--color-team-a)'
+    case 'pull-bonus':
+      return 'var(--color-pull-bonus)'
     case 'possession':
       return 'var(--color-muted)'
     case 'turnover-throw-away':
@@ -49,8 +50,9 @@ export function getVisLogColor(type: VisLogEntry['type']): string {
     case 'turnover-stall':
       return 'var(--color-stall)'
     case 'block':
-    case 'intercept':
       return 'var(--color-block)'
+    case 'intercept':
+      return 'var(--color-intercept)'
     case 'goal':
       return 'var(--color-success)'
     case 'injury-sub':

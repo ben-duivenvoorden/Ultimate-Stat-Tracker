@@ -31,12 +31,17 @@
   --color-warn:     #f5a623;
   --color-warn-bg:  #1a0f00;
   --color-danger:   #ff4d4d;
-  --color-block:         #9c6ef8;
+  /* Block + Intercept: same hue (purple), different shades. Block is the
+   * darker base; Intercept is the lighter sibling. */
+  --color-block:         #7d4eea;
   --color-block-bg:      #150f24;
-  --color-intercept:     #22d3ee;
-  --color-intercept-bg:  #061a1f;
+  --color-intercept:     #c4a3ff;
+  --color-intercept-bg:  #1a1430;
   --color-stall:         #f97316;
   --color-injury-bg:     #1c1200;
+  /* Pull + Pull Bonus: same hue (team blue), different shades. Bonus is the
+   * lighter sibling so the two pull chips read as related but distinct. */
+  --color-pull-bonus:    #6a8cc8;
 
   /* Typography */
   --font-sans: 'Roboto', sans-serif;

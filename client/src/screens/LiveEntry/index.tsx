@@ -55,8 +55,15 @@ export default function LiveEntry() {
   const swapSides        = useGameStore(s => s.swapSides)
   const stageSize        = useStageSize()
 
-  const [logExpanded, setLogExpanded]     = useState(false)
-  const [adminExpanded, setAdminExpanded] = useState(false)
+  // One drawer at most may be expanded at a time; toggling one collapses the
+  // other. Drawers reserve their own width in the flex row, so the canvas
+  // shrinks when a drawer expands rather than being overlaid.
+  type ExpandedDrawer = 'log' | 'admin' | null
+  const [expandedDrawer, setExpandedDrawer] = useState<ExpandedDrawer>(null)
+  const logExpanded   = expandedDrawer === 'log'
+  const adminExpanded = expandedDrawer === 'admin'
+  const toggleDrawer = (which: 'log' | 'admin') =>
+    setExpandedDrawer(prev => (prev === which ? null : which))
 
   // Active context — derived even when state is null so all hooks below can
   // run unconditionally. Default values are inert (null active team, empty
@@ -101,14 +108,16 @@ export default function LiveEntry() {
     ? [state.discHolder]
     : []
 
-  // Logical canvas centre — shifted to compensate for any expanded drawer so
-  // chips at the canvas edge stay on-screen.
+  // Drawer rails (collapsed) and full panels (expanded) both reserve width
+  // from the canvas. Compute the actual stage area = window - drawer widths
+  // - header. Centre is the midpoint of that area; the Stage's coordinate
+  // system is its parent's local space.
   const headerH = HEADER_H + (pickMode ? PICK_STRIP_H : 0)
-  const stageW  = stageSize.w
+  const leftDrawerW  = adminExpanded ? ADMIN_DRAWER_W : DRAWER_RAIL_W
+  const rightDrawerW = logExpanded   ? LOG_DRAWER_W   : DRAWER_RAIL_W
+  const stageW  = Math.max(0, stageSize.w - leftDrawerW - rightDrawerW)
   const stageH  = Math.max(0, stageSize.h - headerH)
-  const leftOffset  = adminExpanded ? (ADMIN_DRAWER_W - DRAWER_RAIL_W) : 0
-  const rightOffset = logExpanded   ? (LOG_DRAWER_W   - DRAWER_RAIL_W) : 0
-  const cx = stageW / 2 + leftOffset / 2 - rightOffset / 2
+  const cx = stageW / 2
   const cy = stageH / 2
 
   // ─── Pill / chip dispatchers ────────────────────────────────────────────────
@@ -148,36 +157,18 @@ export default function LiveEntry() {
         onCancelPickMode={actions.cancelPickMode}
       />
 
-      <div className="flex-1 relative overflow-hidden">
-        {isGameOver ? (
-          <GameOverBanner score={state.score} teams={teams} onBack={actions.backToGameList} />
-        ) : (
-          <Stage
-            // Re-key on team change so Stage remounts cleanly (physics + arrows reset).
-            key={activeTeam}
-            teamId={activeTeam}
-            players={activePlayers}
-            teamColor={teams[activeTeam].color}
-            mode={stageMode}
-            holderId={state.discHolder}
-            pullerId={ui.selPuller}
-            ineligibleIds={ineligibleIds}
-            stallShown={recordingOptions.stall}
-            bonusShown={recordingOptions.pullBonus}
-            arrows={arrows}
-            centre={{ x: cx, y: cy }}
-            bounds={{ w: stageW, h: stageH }}
-            onPillTap={onPillTap}
-            onChipTap={onChipTap}
-            onBackgroundTap={onBackgroundTap}
-          />
-        )}
-
+      {/*
+        Layout: AdminDrawer | Stage | LogDrawer (flex row).
+        Drawers reserve their width so the canvas shrinks when one is
+        expanded, rather than overlapping. Only one drawer expanded at a
+        time (mutual exclusion via toggleDrawer).
+      */}
+      <div className="flex-1 flex overflow-hidden">
         <AdminDrawer
           state={state}
           recordingOptions={recordingOptions}
           expanded={adminExpanded}
-          onToggle={() => setAdminExpanded(v => !v)}
+          onToggle={() => toggleDrawer('admin')}
           onTimeout={actions.recordTimeout}
           onFoul={actions.recordFoul}
           onPick={actions.recordPick}
@@ -186,11 +177,37 @@ export default function LiveEntry() {
           onEndGame={actions.triggerEndGame}
         />
 
+        <div className="flex-1 relative overflow-hidden" style={{ minWidth: 0 }}>
+          {isGameOver ? (
+            <GameOverBanner score={state.score} teams={teams} onBack={actions.backToGameList} />
+          ) : (
+            <Stage
+              // Re-key on team change so Stage remounts cleanly (physics + arrows reset).
+              key={activeTeam}
+              teamId={activeTeam}
+              players={activePlayers}
+              teamColor={teams[activeTeam].color}
+              mode={stageMode}
+              holderId={state.discHolder}
+              pullerId={ui.selPuller}
+              ineligibleIds={ineligibleIds}
+              stallShown={recordingOptions.stall}
+              bonusShown={recordingOptions.pullBonus}
+              arrows={arrows}
+              centre={{ x: cx, y: cy }}
+              bounds={{ w: stageW, h: stageH }}
+              onPillTap={onPillTap}
+              onChipTap={onChipTap}
+              onBackgroundTap={onBackgroundTap}
+            />
+          )}
+        </div>
+
         <LogDrawer
           visLog={visLog}
           players={[...session.gameConfig.rosters.A, ...session.gameConfig.rosters.B]}
           expanded={logExpanded}
-          onToggle={() => setLogExpanded(v => !v)}
+          onToggle={() => toggleDrawer('log')}
           onUndo={actions.undo}
         />
       </div>

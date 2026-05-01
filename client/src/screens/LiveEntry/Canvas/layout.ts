@@ -1,9 +1,10 @@
-import { GAP, HH } from './constants'
-import type { ChipSpec, ChipAlign } from './physics'
+import { HH } from './constants'
+import { rectExitDist, type ChipSpec, type ChipAlign } from './physics'
 
 // Chip identifiers and their on-screen labels.
-// Mature-build naming: pill chips use the terse forms; the event log keeps the
-// long forms ("Blocked by Defence", etc.) via core/format.ts.
+// The chips use the same long defence-action names as the event log so the
+// recorder sees a single, consistent vocabulary. core/format.ts defines the
+// matching log strings.
 export const CHIP_LABELS = {
   pull:         'Pull',
   'pull-bonus': 'Pull Bonus',
@@ -11,8 +12,8 @@ export const CHIP_LABELS = {
   goal:         'Goal',
   tw:           'Throwaway',
   st:           'Stall',
-  blk:          'Block',
-  int:          'Intercept',
+  blk:          'Blocked by Defence',
+  int:          'Intercepted by Defence',
 } as const
 
 export type ChipId = keyof typeof CHIP_LABELS
@@ -27,63 +28,79 @@ export interface BuildOpts {
   bonusShown?: boolean
 }
 
+// Base visible gap (px) between the chip's nearest edge and the pill
+// perimeter, measured along the ray from pill centre. Applied at axial
+// directions (top / right / bottom / left).
+const CHIP_GAP = 12
+// Extra outward push applied to chips on diagonals (~45°) so their long
+// labels (e.g. "Blocked by Defence") don't crash into the axial chips that
+// flank them (Throwaway above, Intercepted by Defence to the right).
+// Scales with how diagonal the angle is — zero at axes, maximum at 45°.
+const CHIP_CORNER_BUMP = 28
+
+// Anchor a chip on the pill's rectangular perimeter (extended by CHIP_GAP +
+// corner bump) along the given ray. Picks the alignment that makes the chip
+// body extend outward, away from the pill.
+function rayAnchor(id: ChipId, angle: number, HW: number): ChipSpec {
+  const cosA = Math.cos(angle)
+  const sinA = Math.sin(angle)
+  const cornerness = Math.min(1, Math.abs(cosA * sinA) * 4) // 0 axial, 1 at 45°
+  // Distance from pill centre to its rect edge along (cosA, sinA), plus the
+  // visible gap. rectExitDist treats the pill as a HW×HH axis-aligned rect.
+  const t = rectExitDist(cosA, sinA, HW, HH) + CHIP_GAP + cornerness * CHIP_CORNER_BUMP
+  const ax = cosA * t
+  const ay = sinA * t
+  // Strict `>` so 45° angles fall through to horizontal alignment, avoiding
+  // a long chip (extending vertically with center-bottom) overlapping the
+  // axial Throwaway chip above.
+  let align: ChipAlign
+  if (Math.abs(sinA) > Math.abs(cosA)) {
+    align = sinA < 0 ? 'center-bottom' : 'center-top'
+  } else {
+    align = cosA > 0 ? 'left-center' : 'right-center'
+  }
+  return { id, label: CHIP_LABELS[id], ax, ay, align }
+}
+
 // Layout for the chips that surround an opened pill.
 //
 // In-play (5 chips today; 6 when stallShown):
 //   - Receiver Error: left
 //   - Goal:           bottom
-//   - Throwaway:      top
-//   - [Stall]:        between top and right (only when stallShown)
-//   - Block:          right (upper of the right pair)
-//   - Intercept:      right (lower of the right pair)
-//
-//   Throwaway / [Stall] / Block / Intercept span evenly along the top→right
-//   quarter-arc (12 → 3 o'clock). Goal and Receiver Error sit alone on the
-//   bottom and left axes since they are different action categories.
+//   - Throwaway / [Stall] / Block / Intercept span the top→right
+//     quarter-arc evenly. Stall sits between Throwaway and Block when shown.
 //
 // Awaiting-pull:
 //   - Pull:       top (always)
 //   - Pull Bonus: right (when bonusShown)
+//
+// All chips use a single rectangular-perimeter formula with CHIP_GAP
+// clearance so they sit at a uniform visible distance from the pill.
 export function buildActions(HW: number, opts: BuildOpts): ChipSpec[] {
   if (opts.phase === 'awaiting-pull') {
-    const chips: ChipSpec[] = [
-      { id: 'pull', label: CHIP_LABELS.pull, ax: 0, ay: -(HH + GAP), align: 'center-bottom' },
-    ]
-    if (opts.bonusShown) {
-      chips.push({
-        id: 'pull-bonus',
-        label: CHIP_LABELS['pull-bonus'],
-        ax: HW + GAP, ay: 0,
-        align: 'left-center',
-      })
-    }
+    const chips: ChipSpec[] = [rayAnchor('pull', -Math.PI / 2, HW)]
+    if (opts.bonusShown) chips.push(rayAnchor('pull-bonus', 0, HW))
     return chips
   }
 
-  const arc: ChipId[] = opts.stallShown ? ['tw', 'st', 'blk', 'int'] : ['tw', 'blk', 'int']
+  // Quarter-arc chips: top→right. 4-step (with stall) or 3-step.
+  const arc: ChipId[] = opts.stallShown
+    ? ['tw', 'st', 'blk', 'int']
+    : ['tw', 'blk', 'int']
   const N = arc.length
-  // Outer anchor radius — sit chips a touch beyond the pill envelope.
-  const R = Math.max(HW, HH) + GAP + 6
-
-  const arcChips: ChipSpec[] = arc.map((id, i) => {
-    const angle = -Math.PI / 2 + (i / (N - 1)) * (Math.PI / 2) // 12 → 3 o'clock
-    const ax = Math.cos(angle) * R
-    const ay = Math.sin(angle) * R
-    // The 12-o'clock chip sits above the pill (chip's bottom touches the
-    // anchor). Every other chip on the arc extends right from its anchor.
-    const align: ChipAlign = i === 0 ? 'center-bottom' : 'left-center'
-    return { id, label: CHIP_LABELS[id], ax, ay, align }
+  const arcChips = arc.map((id, i) => {
+    const angle = -Math.PI / 2 + (i / (N - 1)) * (Math.PI / 2)
+    return rayAnchor(id, angle, HW)
   })
 
   return [
-    { id: 'rec',  label: CHIP_LABELS.rec,  ax: -(HW + GAP), ay: 0,        align: 'right-center' },
-    { id: 'goal', label: CHIP_LABELS.goal, ax: 0,           ay: HH + GAP, align: 'center-top'    },
+    rayAnchor('rec',  Math.PI,    HW),
+    rayAnchor('goal', Math.PI / 2, HW),
     ...arcChips,
   ]
 }
 
 // Map a ChipId to the engine action that should run when the chip is tapped.
-// Returned as a discriminated union so the call site can switch on `kind`.
 export type ChipAction =
   | { kind: 'pull';        bonus: boolean }
   | { kind: 'throwaway' }

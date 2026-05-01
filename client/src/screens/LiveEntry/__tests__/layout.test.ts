@@ -11,13 +11,13 @@ describe('buildActions — in-play (stall hidden)', () => {
   it('places Receiver Error to the left of the pill', () => {
     const rec = chips.find(c => c.id === 'rec')!
     expect(rec.ax).toBeLessThan(0)
-    expect(rec.ay).toBe(0)
+    expect(rec.ay).toBeCloseTo(0)
     expect(rec.align).toBe('right-center')
   })
 
   it('places Goal directly below the pill', () => {
     const goal = chips.find(c => c.id === 'goal')!
-    expect(goal.ax).toBe(0)
+    expect(goal.ax).toBeCloseTo(0)
     expect(goal.ay).toBeGreaterThan(0)
     expect(goal.align).toBe('center-top')
   })
@@ -48,9 +48,11 @@ describe('buildActions — in-play (stall shown)', () => {
     const tw  = chips.find(c => c.id === 'tw')!
     const st  = chips.find(c => c.id === 'st')!
     const blk = chips.find(c => c.id === 'blk')!
-    expect(st.ay).toBeGreaterThan(tw.ay)   // Stall lower on screen than Throwaway
-    expect(st.ay).toBeLessThan(blk.ay)     // Stall higher on screen than Block
-    expect(st.ax).toBeGreaterThan(tw.ax)   // Stall to the right of Throwaway
+    // Stall sits in the upper-right quadrant: to the right of the axial
+    // Throwaway and above the more-horizontal Block.
+    expect(st.ax).toBeGreaterThan(tw.ax) // right of Throwaway
+    expect(st.ax).toBeLessThan(blk.ax)   // left of Block (closer to vertical)
+    expect(st.ay).toBeLessThan(0)        // upper half of canvas
   })
 })
 

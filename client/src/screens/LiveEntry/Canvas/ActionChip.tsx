@@ -37,7 +37,10 @@ export function ActionChip({
         transform: visible
           ? `translate(${ax}px, ${ay}px) translate(${tx}, ${ty}) scale(1)`
           : `translate(0px, 0px) translate(-50%, -50%) scale(0.5)`,
-        opacity: visible ? 1 : 0,
+        // Slightly translucent so pass arrows are visible passing under
+        // chips, but legibility is preserved. Chips still sit above the
+        // arrow layer (z-index inherited from PlayerNode).
+        opacity: visible ? 0.95 : 0,
         transition: visible
           ? `transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms, opacity 160ms ease ${delay}ms`
           : 'transform 140ms ease, opacity 120ms ease',
