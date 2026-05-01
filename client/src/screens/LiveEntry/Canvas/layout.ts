@@ -46,9 +46,10 @@ function rayAnchor(id: ChipId, angle: number, HW: number): ChipSpec {
   const cosA = Math.cos(angle)
   const sinA = Math.sin(angle)
   const cornerness = Math.min(1, Math.abs(cosA * sinA) * 4) // 0 axial, 1 at 45°
+  const connectorLength = CHIP_GAP + cornerness * CHIP_CORNER_BUMP
   // Distance from pill centre to its rect edge along (cosA, sinA), plus the
   // visible gap. rectExitDist treats the pill as a HW×HH axis-aligned rect.
-  const t = rectExitDist(cosA, sinA, HW, HH) + CHIP_GAP + cornerness * CHIP_CORNER_BUMP
+  const t = rectExitDist(cosA, sinA, HW, HH) + connectorLength
   const ax = cosA * t
   const ay = sinA * t
   // Strict `>` so 45° angles fall through to horizontal alignment, avoiding
@@ -60,7 +61,7 @@ function rayAnchor(id: ChipId, angle: number, HW: number): ChipSpec {
   } else {
     align = cosA > 0 ? 'left-center' : 'right-center'
   }
-  return { id, label: CHIP_LABELS[id], ax, ay, align }
+  return { id, label: CHIP_LABELS[id], ax, ay, align, connectorLength }
 }
 
 // Layout for the chips that surround an opened pill.

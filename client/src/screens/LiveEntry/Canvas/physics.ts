@@ -7,7 +7,17 @@ import {
 export interface Vec { x: number; y: number; vx: number; vy: number }
 export interface Rect { l: number; r: number; t: number; b: number }
 export type ChipAlign = 'right-center' | 'left-center' | 'center-top' | 'center-bottom'
-export interface ChipSpec { id: string; label: string; ax: number; ay: number; align: ChipAlign }
+export interface ChipSpec {
+  id: string
+  label: string
+  ax: number
+  ay: number
+  align: ChipAlign
+  /** Length of the connector line from the pill's perimeter to the chip's
+   *  near edge, along the ray from pill centre. Equals CHIP_GAP for axial
+   *  chips and grows with the corner bump for diagonal ones. */
+  connectorLength: number
+}
 
 // Pill label is the player's full name. The pill itself sizes to its
 // content (`width: max-content` in PlayerNode), and physics uses the

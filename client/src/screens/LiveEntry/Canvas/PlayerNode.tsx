@@ -110,6 +110,40 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
         pointerEvents: ineligible ? 'none' : 'auto',
       }}
     >
+      {/* Connector lines from each chip back to the pill's perimeter, in
+          the team colour. Rendered as a tiny SVG anchored at the pill's
+          centre with overflow:visible so the lines sit in pill-local
+          coordinates. */}
+      {chips.length > 0 && (
+        <svg
+          style={{
+            position: 'absolute',
+            left: 0, top: 0, width: 0, height: 0,
+            overflow: 'visible',
+            pointerEvents: 'none',
+            opacity: isOpen ? 0.95 : 0,
+            transition: isOpen ? 'opacity 200ms ease 60ms' : 'opacity 120ms ease',
+          }}
+        >
+          {chips.map(a => {
+            const dist = Math.hypot(a.ax, a.ay)
+            if (dist === 0) return null
+            const ux = a.ax / dist, uy = a.ay / dist
+            const x2 = a.ax, y2 = a.ay
+            const x1 = a.ax - ux * a.connectorLength
+            const y1 = a.ay - uy * a.connectorLength
+            return (
+              <line
+                key={a.id}
+                x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke={teamColor}
+                strokeWidth={2}
+                strokeLinecap="round"
+              />
+            )
+          })}
+        </svg>
+      )}
       {chips.map((a, i) => (
         <ActionChip
           key={a.id}
