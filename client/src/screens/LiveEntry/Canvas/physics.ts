@@ -141,7 +141,7 @@ export function openZoneRects(cx: number, cy: number, HW: number, chips: ChipSpe
 // with the weak spring, stay) further apart.
 export function initialPositions(n: number, w: number, h: number): Vec[] {
   const cx = w / 2, cy = h / 2
-  const r = Math.min(w, h) * 0.36
+  const r = Math.min(w, h) * 0.46
   return Array.from({ length: n }, (_, i) => {
     const a = (i / n) * Math.PI * 2 - Math.PI / 2
     return {
