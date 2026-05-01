@@ -50,7 +50,7 @@ export function ActionChip({
         pointerEvents: visible ? 'auto' : 'none',
         padding: '5px 10px',
         borderRadius: 9999,
-        border: `1px solid ${accent}`,
+        border: `${disabled ? '1.5px dashed' : '1px solid'} ${accent}`,
         background: fill,
         color: accent,
         fontSize: 11, fontWeight: 600, letterSpacing: 0.2,
