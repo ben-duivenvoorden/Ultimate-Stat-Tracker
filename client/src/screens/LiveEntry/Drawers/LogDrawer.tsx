@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import type { VisLogEntry, Player } from '@/core/types'
 import { formatVisLogEntry, getVisLogColor, isMutedLogEntry } from '@/core/format'
 import { Label } from '@/components/ui/Label'
@@ -18,9 +18,16 @@ export const LOG_DRAWER_W = 280
 export function LogDrawer({ visLog, players, expanded, onToggle, onUndo }: LogDrawerProps) {
   const logRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
-  }, [visLog.length])
+  // Pin the scroll to the most-recent entry whenever the log changes OR the
+  // drawer expands. The drawer's children are unmounted while collapsed, so
+  // every expansion is effectively a fresh mount of this scroller — without
+  // the `expanded` dep, the scrollTop stays at 0 and the user sees the
+  // oldest events first.
+  useLayoutEffect(() => {
+    if (expanded && logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight
+    }
+  }, [visLog.length, expanded])
 
   return (
     <Drawer
