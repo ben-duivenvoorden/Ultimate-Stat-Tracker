@@ -23,7 +23,7 @@ export const chipWidth = (label: string): number =>
   Math.round(label.length * 7.5 + 28)
 
 export const pillHalfWidth = (name: string): number =>
-  Math.round((pillLabel(name).length * 8.5 + 32 + 3) / 2)
+  Math.round((pillLabel(name).length * 9 + 36 + 4) / 2)
 
 // Extra padding added to each chip rect when computing the open zone, so
 // other pills get pushed a little clear of the chip rather than touching it.

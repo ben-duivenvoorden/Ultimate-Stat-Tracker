@@ -124,7 +124,7 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
         onClick={onClick}
         style={{
           height: PILL_H,
-          padding: '0 16px',
+          padding: '0 18px',
           boxSizing: 'border-box',
           borderRadius: 9999,
           border: `${borderWidth}px solid ${borderColor}`,
@@ -141,7 +141,7 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
             ? 'translate(-50%, -50%) scale(1.06)'
             : 'translate(-50%, -50%) scale(1)',
           fontFamily: 'var(--font-sans)',
-          fontSize: 15, fontWeight: 600, letterSpacing: 0.2,
+          fontSize: 16, fontWeight: 600, letterSpacing: 0.2,
           whiteSpace: 'nowrap',
           userSelect: 'none', WebkitUserSelect: 'none',
           cursor: ineligible ? 'default' : (dragging ? 'grabbing' : 'grab'),

@@ -1,5 +1,6 @@
-// Pill geometry
-export const PILL_H = 38
+// Pill geometry — slightly larger than the reference design's 38 px so the
+// pills are easier to tap on mobile.
+export const PILL_H = 44
 export const HH = PILL_H / 2
 export const GAP = 6
 export const CHIP_H = 22
