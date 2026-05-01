@@ -9,6 +9,8 @@ import type {
   GameSession,
   RecordingOptions,
 } from './types'
+import type { PillSize } from '@/screens/LiveEntry/Canvas/constants'
+import { PILL_SIZE_CYCLE } from '@/screens/LiveEntry/Canvas/constants'
 import { otherTeam, DEFAULT_RECORDING_OPTIONS } from './types'
 import {
   deriveGameState,
@@ -34,6 +36,8 @@ interface GameStore {
   /** When true, Team A and Team B render on opposite sides of the screen.
    *  Per-device display preference — never goes on the wire. */
   swapSides: boolean
+  /** Player pill size — per-device display preference. */
+  pillSize: PillSize
 
   // Transient (not persisted)
   showEventMenu: boolean
@@ -72,6 +76,7 @@ interface GameStore {
   // Pure UI
   setShowEventMenu:  (show: boolean) => void
   toggleSwapSides:   () => void
+  cyclePillSize:     () => void
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
@@ -120,6 +125,7 @@ export const useGameStore = create<GameStore>()(
       showEventMenu:    false,
       recordingOptions: DEFAULT_RECORDING_OPTIONS,
       swapSides:        false,
+      pillSize:         'md',
 
       // ── selectGame ──────────────────────────────────────────────────────────
       // Start a fresh game session (overwrites any existing one).
@@ -516,6 +522,13 @@ export const useGameStore = create<GameStore>()(
       toggleSwapSides() {
         set(s => ({ swapSides: !s.swapSides }))
       },
+
+      // ── cyclePillSize ───────────────────────────────────────────────────────
+      // Cycle through small / medium / large pill sizes. Per-device display
+      // preference — what feels right for thumbs / screen size.
+      cyclePillSize() {
+        set(s => ({ pillSize: PILL_SIZE_CYCLE[s.pillSize] }))
+      },
     }),
     {
       name:    STORAGE_KEY,
@@ -547,6 +560,7 @@ export const useGameStore = create<GameStore>()(
         selPuller:        state.selPuller,
         recordingOptions: state.recordingOptions,
         swapSides:        state.swapSides,
+        pillSize:         state.pillSize,
       }),
     },
   ),

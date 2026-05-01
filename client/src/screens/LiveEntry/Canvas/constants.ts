@@ -1,7 +1,22 @@
-// Pill geometry — slightly larger than the reference design's 38 px so the
-// pills are easier to tap on mobile.
-export const PILL_H = 44
+// Pill geometry — base dimensions for the 'md' (default) size. The actual
+// rendered size is base × pillScale (see PILL_SCALE_FACTORS).
+export const PILL_H = 48
 export const HH = PILL_H / 2
+export const PILL_FONT_SIZE = 17
+export const PILL_PADDING_X = 20
+
+// Pill-size presets. The user cycles through these from the admin drawer.
+export type PillSize = 'sm' | 'md' | 'lg'
+export const PILL_SCALE_FACTORS: Record<PillSize, number> = {
+  sm: 0.85,
+  md: 1.0,
+  lg: 1.18,
+}
+export const PILL_SIZE_CYCLE: Record<PillSize, PillSize> = {
+  sm: 'md',
+  md: 'lg',
+  lg: 'sm',
+}
 export const GAP = 6
 export const CHIP_H = 22
 

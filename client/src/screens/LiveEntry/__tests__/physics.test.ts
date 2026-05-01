@@ -63,7 +63,7 @@ describe('openZoneRects', () => {
       { id: 'rec',  label: 'Receiver', ax: -40, ay: 0,  align: 'right-center' },
       { id: 'tw',   label: 'Throwaway', ax: 0,  ay: -25, align: 'center-bottom' },
     ]
-    const rects = openZoneRects(100, 100, 30, chips)
+    const rects = openZoneRects(100, 100, 30, 22, chips)
     expect(rects).toHaveLength(4)
     for (const r of rects) {
       expect(r.r).toBeGreaterThan(r.l)

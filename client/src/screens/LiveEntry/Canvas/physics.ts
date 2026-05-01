@@ -1,5 +1,5 @@
 import {
-  HH, CHIP_H,
+  CHIP_H,
   REPULSE_R, REPULSE_K, FRICTION, MIN_SPEED, BUFFER, CENTER_K, BOUNDS_MARGIN,
 } from './constants'
 
@@ -103,9 +103,16 @@ export function sampleBezier(
 // chip rect is padded by CHIP_RECT_PAD so other pills get pushed slightly
 // clear of the chip rather than just touching its edge.
 // Other pills are pushed out of these rects each frame.
-export function openZoneRects(cx: number, cy: number, HW: number, chips: ChipSpec[]): Rect[] {
+//
+// `halfHeight` is the pill's effective half-height (HH × pillScale). Chips
+// always use the constant CHIP_H — the chip set itself doesn't scale.
+export function openZoneRects(
+  cx: number, cy: number,
+  HW: number, halfHeight: number,
+  chips: ChipSpec[],
+): Rect[] {
   const rects: Rect[] = []
-  rects.push({ l: cx - HW, r: cx + HW, t: cy - HH, b: cy + HH })
+  rects.push({ l: cx - HW, r: cx + HW, t: cy - halfHeight, b: cy + halfHeight })
   for (const a of chips) {
     const cw = chipWidth(a.label)
     const acx = cx + a.ax, acy = cy + a.ay
@@ -158,6 +165,8 @@ export interface PhysicsStepInput {
    *  available, falling back to the heuristic. Drives both pairwise
    *  repulsion strength and the hard non-overlap constraint. */
   halfWidths: number[]
+  /** Effective pill half-height (HH × pillScale). Same for every pill. */
+  halfHeight: number
   dt:         number
   centre:     { x: number; y: number }
   bounds:     { w: number; h: number }
@@ -169,7 +178,7 @@ export interface PhysicsStepInput {
 // One physics tick. Mutates `positions` in place. Pure function of inputs:
 // no DOM, no module state, safe for unit tests.
 export function stepPhysics(input: PhysicsStepInput): void {
-  const { positions, halfWidths, dt, centre, bounds, drag, open, openChips } = input
+  const { positions, halfWidths, halfHeight, dt, centre, bounds, drag, open, openChips } = input
   const cx = centre.x, cy = centre.y
   const { w, h } = bounds
 
@@ -195,7 +204,7 @@ export function stepPhysics(input: PhysicsStepInput): void {
       const ady = Math.abs(dy)
       // Centre-to-centre minimum distances at which the rects would just touch.
       const minDx = hwI + halfWidths[j]
-      const minDy = 2 * HH
+      const minDy = 2 * halfHeight
       // Clearance (>=0 when rects don't overlap).
       const cxClear = Math.max(0, adx - minDx)
       const cyClear = Math.max(0, ady - minDy)
@@ -243,7 +252,7 @@ export function stepPhysics(input: PhysicsStepInput): void {
         const dx = a.x - b.x
         const dy = a.y - b.y
         const minDx = halfWidths[i] + halfWidths[j] + BUFFER
-        const minDy = 2 * HH + BUFFER
+        const minDy = 2 * halfHeight + BUFFER
         const ox = minDx - Math.abs(dx)
         const oy = minDy - Math.abs(dy)
         if (ox > 0 && oy > 0) {
@@ -277,14 +286,14 @@ export function stepPhysics(input: PhysicsStepInput): void {
     if (open >= 0 && openChips.length > 0) {
       const o = positions[open]
       const ohw = halfWidths[open]
-      const rects = openZoneRects(o.x, o.y, ohw, openChips)
+      const rects = openZoneRects(o.x, o.y, ohw, halfHeight, openChips)
       const CHIP_BUFFER = 16
       for (let i = 0; i < positions.length; i++) {
         if (i === drag || i === open) continue
         const p = positions[i]
         const phw = halfWidths[i]
         const pl = p.x - phw - CHIP_BUFFER, pr = p.x + phw + CHIP_BUFFER
-        const pt = p.y - HH  - CHIP_BUFFER, pb = p.y + HH  + CHIP_BUFFER
+        const pt = p.y - halfHeight - CHIP_BUFFER, pb = p.y + halfHeight + CHIP_BUFFER
         for (const rc of rects) {
           const ox = Math.min(pr, rc.r) - Math.max(pl, rc.l)
           const oy = Math.min(pb, rc.b) - Math.max(pt, rc.t)
@@ -313,12 +322,12 @@ export function stepPhysics(input: PhysicsStepInput): void {
       const hw = halfWidths[i]
       let minX = hw + BOUNDS_MARGIN
       let maxX = w - hw - BOUNDS_MARGIN
-      let minY = HH + BOUNDS_MARGIN
-      let maxY = h - HH - BOUNDS_MARGIN
+      let minY = halfHeight + BOUNDS_MARGIN
+      let maxY = h - halfHeight - BOUNDS_MARGIN
 
       if (i === open && openChips.length > 0) {
-        const rects = openZoneRects(0, 0, hw, openChips)
-        let extLeft = hw, extRight = hw, extTop = HH, extBottom = HH
+        const rects = openZoneRects(0, 0, hw, halfHeight, openChips)
+        let extLeft = hw, extRight = hw, extTop = halfHeight, extBottom = halfHeight
         for (const r of rects) {
           if (-r.l > extLeft)   extLeft   = -r.l
           if ( r.r > extRight)  extRight  =  r.r

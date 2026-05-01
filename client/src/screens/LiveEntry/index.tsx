@@ -63,6 +63,7 @@ export default function LiveEntry() {
   const actions          = useGameActions()
   const recordingOptions = useRecordingOptions()
   const swapSides        = useGameStore(s => s.swapSides)
+  const pillSize         = useGameStore(s => s.pillSize)
   const stageSize        = useStageSize()
 
   // One drawer at most may be expanded at a time; toggling one collapses the
@@ -186,6 +187,8 @@ export default function LiveEntry() {
           onInjurySub={actions.triggerInjurySub}
           onHalfTime={actions.triggerHalfTime}
           onEndGame={actions.triggerEndGame}
+          pillSize={pillSize}
+          onCyclePillSize={actions.cyclePillSize}
         />
 
         <div className="flex-1 relative overflow-hidden" style={{ minWidth: 0 }}>
@@ -204,6 +207,7 @@ export default function LiveEntry() {
               ineligibleIds={ineligibleIds}
               stallShown={recordingOptions.stall}
               bonusShown={recordingOptions.pullBonus}
+              pillSize={pillSize}
               arrows={arrows}
               centre={{ x: cx, y: cy }}
               bounds={{ w: stageW, h: stageH }}

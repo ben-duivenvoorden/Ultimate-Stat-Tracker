@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Player, PlayerId } from '@/core/types'
-import { TAP_THRESH, HH } from './constants'
+import { TAP_THRESH, HH, PILL_SCALE_FACTORS, type PillSize } from './constants'
 import {
   initialPositions, pillHalfWidth, stepPhysics, eventXY, computeArrowPath,
   type ChipSpec, type Vec,
@@ -30,6 +30,10 @@ export interface StageProps {
   /** Recording-options-driven chip toggles. */
   stallShown: boolean
   bonusShown: boolean
+
+  /** Per-device pill-size preference (sm / md / lg). Scales pill dimensions
+   *  and the physics half-height in lockstep. */
+  pillSize: PillSize
 
   /** Pass arrows to render on this stage; from/to indices match `players`. */
   arrows: PassArrowSpec[]
@@ -114,18 +118,25 @@ export function Stage(props: StageProps) {
   const openPlayer = openIdx >= 0 ? props.players[openIdx] : null
   const openChips: ChipSpec[] = openPlayer ? chipsForPlayer(openPlayer) : []
 
+  // Pill-size scale (per-device preference). Drives both the rendered pill
+  // dimensions in PlayerNode and the half-height passed to physics.
+  const scale = PILL_SCALE_FACTORS[props.pillSize]
+  const scaledHalfHeight = HH * scale
+
   // Latest-props ref so the rAF loop sees current centre/bounds without restarting.
   const tickCtx = useRef({
     centre: props.centre,
     bounds: props.bounds,
     arrows: props.arrows,
     openChips,
+    halfHeight: scaledHalfHeight,
   })
   tickCtx.current = {
     centre: props.centre,
     bounds: props.bounds,
     arrows: props.arrows,
     openChips,
+    halfHeight: scaledHalfHeight,
   }
 
   function applyDOM() {
@@ -152,6 +163,7 @@ export function Stage(props: StageProps) {
       stepPhysics({
         positions:  posRef.current,
         halfWidths: halfWidthsRef.current,
+        halfHeight: ctx.halfHeight,
         dt,
         centre:     ctx.centre,
         bounds:     ctx.bounds,
@@ -176,8 +188,8 @@ export function Stage(props: StageProps) {
         const a = posRef.current[pass.fromIdx]
         const b = posRef.current[pass.toIdx]
         if (!a || !b) continue
-        const halfA = { hw: halfWidthsRef.current[pass.fromIdx], hh: HH }
-        const halfB = { hw: halfWidthsRef.current[pass.toIdx],   hh: HH }
+        const halfA = { hw: halfWidthsRef.current[pass.fromIdx], hh: ctx.halfHeight }
+        const halfB = { hw: halfWidthsRef.current[pass.toIdx],   hh: ctx.halfHeight }
         const geom = computeArrowPath(a.x, a.y, b.x, b.y, halfA, halfB)
         slot.path.setAttribute('d', geom.d)
         slot.path.setAttribute('opacity', k === 0 ? '1' : '0.35')
@@ -300,6 +312,7 @@ export function Stage(props: StageProps) {
             ref={(el) => { nodeRefs.current[i] = el }}
             name={p.name}
             teamColor={props.teamColor}
+            scale={scale}
             isHolder={isHolder}
             isPuller={isPuller}
             isOpen={isOpen}

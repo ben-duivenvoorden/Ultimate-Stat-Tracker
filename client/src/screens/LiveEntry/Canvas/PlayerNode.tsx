@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useRef } from 'react'
-import { PILL_H } from './constants'
+import { PILL_H, PILL_FONT_SIZE, PILL_PADDING_X } from './constants'
 import { pillLabel, type ChipSpec } from './physics'
 import { ActionChip } from './ActionChip'
 import { CHIP_LABELS, type ChipId } from './layout'
@@ -9,6 +9,8 @@ import type { VisLogEntry } from '@/core/types'
 interface PlayerNodeProps {
   name: string
   teamColor: string
+  /** Multiplier on the base pill dimensions (height, font, padding). */
+  scale: number
   isHolder: boolean
   isPuller: boolean
   isOpen: boolean
@@ -59,7 +61,7 @@ function chipIdToVisType(id: ChipId): VisLogEntry['type'] | null {
 }
 
 export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function PlayerNode(
-  { name, teamColor, isHolder, isPuller, isOpen, dragging, ineligible, chips,
+  { name, teamColor, scale, isHolder, isPuller, isOpen, dragging, ineligible, chips,
     onMouseDown, onTouchStart, onClick, onChipClick, onMeasureWidth }, ref,
 ) {
   const display = pillLabel(name)
@@ -123,8 +125,8 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
         onTouchStart={onTouchStart}
         onClick={onClick}
         style={{
-          height: PILL_H,
-          padding: '0 18px',
+          height: PILL_H * scale,
+          padding: `0 ${PILL_PADDING_X * scale}px`,
           boxSizing: 'border-box',
           borderRadius: 9999,
           border: `${borderWidth}px solid ${borderColor}`,
@@ -141,7 +143,7 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
             ? 'translate(-50%, -50%) scale(1.06)'
             : 'translate(-50%, -50%) scale(1)',
           fontFamily: 'var(--font-sans)',
-          fontSize: 16, fontWeight: 600, letterSpacing: 0.2,
+          fontSize: PILL_FONT_SIZE * scale, fontWeight: 600, letterSpacing: 0.2,
           whiteSpace: 'nowrap',
           userSelect: 'none', WebkitUserSelect: 'none',
           cursor: ineligible ? 'default' : (dragging ? 'grabbing' : 'grab'),
