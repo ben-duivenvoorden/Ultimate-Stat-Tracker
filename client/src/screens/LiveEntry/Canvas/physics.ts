@@ -14,11 +14,17 @@ export const pillLabel = (name: string): string =>
 
 // Approx rendered widths for the fixed pill / chip typography.
 // chip: 11px / 600 weight; pill: 15px / 600 weight.
+// We deliberately overestimate so the push-out pass pushes other pills clear
+// of the actual rendered chip rather than the smaller heuristic bbox.
 export const chipWidth = (label: string): number =>
-  Math.round(label.length * 6.5 + 20)
+  Math.round(label.length * 7.5 + 28)
 
 export const pillHalfWidth = (name: string): number =>
   Math.round((pillLabel(name).length * 8.5 + 32 + 3) / 2)
+
+// Extra padding added to each chip rect when computing the open zone, so
+// other pills get pushed a little clear of the chip rather than touching it.
+const CHIP_RECT_PAD = 6
 
 export function rectExitDist(ux: number, uy: number, hw: number, hh: number): number {
   const tx = ux !== 0 ? hw / Math.abs(ux) : Infinity
@@ -90,7 +96,9 @@ export function sampleBezier(
   return out
 }
 
-// Axis-aligned rects covering the open pill + its chip footprints.
+// Axis-aligned rects covering the open pill + its chip footprints. Each
+// chip rect is padded by CHIP_RECT_PAD so other pills get pushed slightly
+// clear of the chip rather than just touching its edge.
 // Other pills are pushed out of these rects each frame.
 export function openZoneRects(cx: number, cy: number, HW: number, chips: ChipSpec[]): Rect[] {
   const rects: Rect[] = []
@@ -113,7 +121,14 @@ export function openZoneRects(cx: number, cy: number, HW: number, chips: ChipSpe
       l = acx - cw / 2; r = acx + cw / 2
       t = acy - CHIP_H; b = acy
     }
-    rects.push({ l, r, t, b })
+    // Pad outward so the push-out clears the chip's rendered border + a touch
+    // of breathing room.
+    rects.push({
+      l: l - CHIP_RECT_PAD,
+      r: r + CHIP_RECT_PAD,
+      t: t - CHIP_RECT_PAD,
+      b: b + CHIP_RECT_PAD,
+    })
   }
   return rects
 }
@@ -251,16 +266,20 @@ export function stepPhysics(input: PhysicsStepInput): void {
     }
 
     // (2) Open-pill chip-zone push-out (other pills only).
+    // Uses a larger buffer than pair non-overlap so pills are clearly clear
+    // of the rendered chip — covers any heuristic mismatch in chipWidth and
+    // gives the chip's drop-shadow a bit of breathing room.
     if (open >= 0 && openChips.length > 0) {
       const o = positions[open]
       const ohw = halfWidths[open]
       const rects = openZoneRects(o.x, o.y, ohw, openChips)
+      const CHIP_BUFFER = 16
       for (let i = 0; i < positions.length; i++) {
         if (i === drag || i === open) continue
         const p = positions[i]
         const phw = halfWidths[i]
-        const pl = p.x - phw - BUFFER, pr = p.x + phw + BUFFER
-        const pt = p.y - HH - BUFFER,  pb = p.y + HH + BUFFER
+        const pl = p.x - phw - CHIP_BUFFER, pr = p.x + phw + CHIP_BUFFER
+        const pt = p.y - HH  - CHIP_BUFFER, pb = p.y + HH  + CHIP_BUFFER
         for (const rc of rects) {
           const ox = Math.min(pr, rc.r) - Math.max(pl, rc.l)
           const oy = Math.min(pb, rc.b) - Math.max(pt, rc.t)
@@ -270,11 +289,13 @@ export function stepPhysics(input: PhysicsStepInput): void {
             if (oy < ox) {
               const sgn = p.y === rcy ? 1 : Math.sign(p.y - rcy)
               p.y += sgn * oy
-              if (Math.sign(p.vy) !== sgn && p.vy !== 0) p.vy = 0
+              // Zero velocity heading back into the chip so the spring can't
+              // immediately drag the pill back through the chip next frame.
+              if (Math.sign(p.vy) !== sgn) p.vy = 0
             } else {
               const sgn = p.x === rcx ? 1 : Math.sign(p.x - rcx)
               p.x += sgn * ox
-              if (Math.sign(p.vx) !== sgn && p.vx !== 0) p.vx = 0
+              if (Math.sign(p.vx) !== sgn) p.vx = 0
             }
           }
         }
