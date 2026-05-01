@@ -70,7 +70,7 @@ export default function GameSettings() {
         <Section title="EVENTS">
           <div className="flex flex-col gap-2">
             <CompactToggle
-              label="Pull Bonus"
+              label="Pull Distance Bonus"
               hint="End-zone pulls"
               checked={options.pullBonus}
               onChange={v => updateRecordingOption('pullBonus', v)}

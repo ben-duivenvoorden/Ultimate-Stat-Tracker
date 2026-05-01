@@ -64,7 +64,7 @@ describe('buildActions — awaiting-pull', () => {
     expect(chips.find(c => c.id === 'brick')!.ax).toBeLessThan(0)  // brick on the left
   })
 
-  it('returns Pull + Brick + Pull Bonus when bonus is shown', () => {
+  it('returns Pull + Brick + Pull Distance Bonus when bonus is shown', () => {
     const chips = buildActions(40, { phase: 'awaiting-pull', bonusShown: true })
     expect(chips.map(c => c.id).sort()).toEqual(['brick', 'pull', 'pull-bonus'])
     expect(chips.find(c => c.id === 'pull-bonus')!.ax).toBeGreaterThan(0)

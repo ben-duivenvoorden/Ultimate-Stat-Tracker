@@ -7,7 +7,7 @@ import { rectExitDist, type ChipSpec, type ChipAlign } from './physics'
 // matching log strings.
 export const CHIP_LABELS = {
   pull:         'Pull',
-  'pull-bonus': 'Pull Bonus',
+  'pull-bonus': 'Pull Distance Bonus',
   brick:        'Brick',
   rec:          'Receiver Error',
   goal:         'Goal',
@@ -24,7 +24,7 @@ export interface BuildOpts {
   /** Show the Stall chip on in-play opens. Hidden by default
    *  (recordingOptions.stall === false). */
   stallShown?: boolean
-  /** Show the Pull Bonus chip on awaiting-pull opens
+  /** Show the Pull Distance Bonus chip on awaiting-pull opens
    *  (recordingOptions.pullBonus). */
   bonusShown?: boolean
 }
@@ -72,16 +72,16 @@ function rayAnchor(id: ChipId, angle: number, HW: number): ChipSpec {
 //     quarter-arc evenly. Stall sits between Throwaway and Block when shown.
 //
 // Awaiting-pull:
-//   - Pull:       top (always)
-//   - Pull Bonus: right (when bonusShown)
+//   - Pull:                top (always)
+//   - Pull Distance Bonus: right (when bonusShown)
 //
 // All chips use a single rectangular-perimeter formula with CHIP_GAP
 // clearance so they sit at a uniform visible distance from the pill.
 export function buildActions(HW: number, opts: BuildOpts): ChipSpec[] {
   if (opts.phase === 'awaiting-pull') {
-    // Pull at top, Brick on the left, Pull Bonus on the right (when shown).
-    // Three axial positions keep each chip on its own side, which scales
-    // cleanly whether or not Pull Bonus is enabled.
+    // Pull at top, Brick on the left, Pull Distance Bonus on the right
+    // (when shown). Three axial positions keep each chip on its own side,
+    // which scales cleanly whether or not the bonus is enabled.
     const chips: ChipSpec[] = [
       rayAnchor('pull',  -Math.PI / 2, HW),
       rayAnchor('brick',  Math.PI,     HW),

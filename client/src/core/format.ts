@@ -17,7 +17,7 @@ export function formatVisLogEntry(entry: VisLogEntry, players: Player[]): string
       return `— Point Started — A: ${lineNames(entry.lineA)} | B: ${lineNames(entry.lineB)}`
     }
     case 'pull':                     return `Pull — ${name(entry.playerId)}`
-    case 'pull-bonus':               return `Pull Bonus — ${name(entry.playerId)}`
+    case 'pull-bonus':               return `Pull Distance Bonus — ${name(entry.playerId)}`
     case 'brick':                    return `Brick — ${name(entry.playerId)}`
     case 'possession':               return `Possession: ${name(entry.playerId)}`
     case 'turnover-throw-away':      return `Throw Away — ${name(entry.playerId)}`
