@@ -8,9 +8,12 @@ export interface Rect { l: number; r: number; t: number; b: number }
 export type ChipAlign = 'right-center' | 'left-center' | 'center-top' | 'center-bottom'
 export interface ChipSpec { id: string; label: string; ax: number; ay: number; align: ChipAlign }
 
-// Truncate long names so pillHalfWidth stays predictable for physics packing.
-export const pillLabel = (name: string): string =>
-  name.length > 11 ? name.slice(0, 10) + '…' : name
+// Pill label is the player's full name. The pill itself sizes to its
+// content (`width: max-content` in PlayerNode), and physics uses the
+// rendered half-width measured by ResizeObserver — so a long name simply
+// makes its pill wider, with everything else (chip anchors, no-overlap,
+// bounds clamp) adapting automatically.
+export const pillLabel = (name: string): string => name
 
 // Approx rendered widths for the fixed pill / chip typography.
 // chip: 11px / 600 weight; pill: 15px / 600 weight.

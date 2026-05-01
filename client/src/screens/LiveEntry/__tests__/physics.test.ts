@@ -73,20 +73,16 @@ describe('openZoneRects', () => {
 })
 
 describe('pillLabel', () => {
-  it('passes through short names', () => {
+  it('returns the full name regardless of length', () => {
     expect(pillLabel('Wen')).toBe('Wen')
-  })
-  it('truncates names longer than 11 chars', () => {
-    expect(pillLabel('Stephanopoulos')).toBe('Stephanopo…')
+    expect(pillLabel('Stephanopoulos')).toBe('Stephanopoulos')
   })
 })
 
 describe('pillHalfWidth', () => {
-  it('uses the truncated label, not the raw name', () => {
-    const a = pillHalfWidth('Wen')
-    const b = pillHalfWidth('Stephanopoulos')          // truncates to 11 chars
-    const c = pillHalfWidth('A123456789…')             // already 11 chars
-    expect(b).toBe(c)
-    expect(b).toBeGreaterThan(a)
+  it('grows with name length (longer name → wider pill)', () => {
+    const short = pillHalfWidth('Wen')
+    const long  = pillHalfWidth('Stephanopoulos')
+    expect(long).toBeGreaterThan(short)
   })
 })
