@@ -30,12 +30,22 @@ export function Header({
         >
           ←
         </button>
-        <div className="flex-1 flex items-center justify-center gap-3">
-          <span className="text-sm font-bold" style={{ color: teams[teamLeft].color }}>{teams[teamLeft].short}</span>
-          <strong className="text-3xl font-black tabular-nums leading-none text-content">{score[teamLeft]}</strong>
-          <span className="text-dim text-base">–</span>
-          <strong className="text-3xl font-black tabular-nums leading-none text-content">{score[teamCentre]}</strong>
-          <span className="text-sm font-bold" style={{ color: teams[teamCentre].color }}>{teams[teamCentre].short}</span>
+        <div className="flex-1 flex items-center justify-center gap-2 min-w-0 px-2">
+          <span
+            className="text-sm font-bold truncate text-right flex-1"
+            style={{ color: teams[teamLeft].color }}
+          >
+            {teams[teamLeft].name}
+          </span>
+          <strong className="text-3xl font-black tabular-nums leading-none text-content flex-shrink-0">{score[teamLeft]}</strong>
+          <span className="text-dim text-base flex-shrink-0">–</span>
+          <strong className="text-3xl font-black tabular-nums leading-none text-content flex-shrink-0">{score[teamCentre]}</strong>
+          <span
+            className="text-sm font-bold truncate text-left flex-1"
+            style={{ color: teams[teamCentre].color }}
+          >
+            {teams[teamCentre].name}
+          </span>
         </div>
         <button
           onClick={onSwap}

@@ -49,26 +49,55 @@ export default function LineSelection() {
     }
   }
 
+  const score = state?.score ?? { A: 0, B: 0 }
+  const teamLeft   = swapSides ? 'B' : 'A'
+  const teamCentre = swapSides ? 'A' : 'B'
+
   return (
     <div className="h-full flex flex-col bg-bg text-content">
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-border">
+      {/* Row 1: back · score · (spacer). Mirrors the LiveEntry header so the
+          score stays visible across screen transitions. */}
+      <div
+        className="flex-shrink-0 flex items-center justify-between px-3 h-12"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
         <button
           onClick={backToGameList}
-          className="text-muted hover:text-content transition-colors cursor-pointer"
+          className="text-muted hover:text-content transition-colors cursor-pointer text-lg leading-none"
           title="Back to games"
         >
           ←
         </button>
-        <div className="flex-1">
-          <Label block>
-            {isInjurySub ? 'INJURY SUBSTITUTION — MID-POINT' : 'LINE SELECTION'}
-          </Label>
+        <div className="flex-1 flex items-center justify-center gap-2 min-w-0 px-2">
+          <span
+            className="text-sm font-bold truncate text-right flex-1"
+            style={{ color: teams[teamLeft].color }}
+          >
+            {teams[teamLeft].name}
+          </span>
+          <strong className="text-3xl font-black tabular-nums leading-none text-content flex-shrink-0">{score[teamLeft]}</strong>
+          <span className="text-dim text-base flex-shrink-0">–</span>
+          <strong className="text-3xl font-black tabular-nums leading-none text-content flex-shrink-0">{score[teamCentre]}</strong>
+          <span
+            className="text-sm font-bold truncate text-left flex-1"
+            style={{ color: teams[teamCentre].color }}
+          >
+            {teams[teamCentre].name}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          <Btn variant="primary" size="md" onClick={onConfirmClick}>
-            {isInjurySub ? 'Confirm Substitutions' : 'Confirm Line'}
-          </Btn>
-        </div>
+        {/* Right-side spacer keeps the score visually centred and matches the
+            width of the back arrow on the left. */}
+        <span className="w-5" aria-hidden />
+      </div>
+
+      {/* Row 2: title (well clear of the back arrow) + Confirm button. */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-border">
+        <Label block>
+          {isInjurySub ? 'INJURY SUBSTITUTION — MID-POINT' : 'LINE SELECTION'}
+        </Label>
+        <Btn variant="primary" size="md" onClick={onConfirmClick}>
+          {isInjurySub ? 'Confirm Substitutions' : 'Confirm Line'}
+        </Btn>
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">
