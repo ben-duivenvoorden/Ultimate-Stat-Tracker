@@ -325,7 +325,11 @@ export function stepPhysics(input: PhysicsStepInput): void {
       let minY = halfHeight + BOUNDS_MARGIN
       let maxY = h - halfHeight - BOUNDS_MARGIN
 
-      if (i === open && openChips.length > 0) {
+      // While the open pill is being *dragged* we let it reach the edges
+      // freely — chips may overflow off-screen during the drag, but that's
+      // expected and snaps back when released. Otherwise expand the clamp
+      // to keep the chip footprint on-screen.
+      if (i === open && i !== drag && openChips.length > 0) {
         const rects = openZoneRects(0, 0, hw, halfHeight, openChips)
         let extLeft = hw, extRight = hw, extTop = halfHeight, extBottom = halfHeight
         for (const r of rects) {
