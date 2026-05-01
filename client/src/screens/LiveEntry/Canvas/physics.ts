@@ -1,6 +1,7 @@
 import {
   CHIP_H,
-  REPULSE_R, REPULSE_K, FRICTION, MIN_SPEED, BUFFER, CENTER_K, BOUNDS_MARGIN,
+  REPULSE_R, REPULSE_K, FRICTION, MIN_SPEED, BUFFER, CENTER_K,
+  BOUNDS_MARGIN_X, BOUNDS_MARGIN_Y,
 } from './constants'
 
 export interface Vec { x: number; y: number; vx: number; vy: number }
@@ -320,10 +321,10 @@ export function stepPhysics(input: PhysicsStepInput): void {
     for (let i = 0; i < positions.length; i++) {
       const p = positions[i]
       const hw = halfWidths[i]
-      let minX = hw + BOUNDS_MARGIN
-      let maxX = w - hw - BOUNDS_MARGIN
-      let minY = halfHeight + BOUNDS_MARGIN
-      let maxY = h - halfHeight - BOUNDS_MARGIN
+      let minX = hw + BOUNDS_MARGIN_X
+      let maxX = w - hw - BOUNDS_MARGIN_X
+      let minY = halfHeight + BOUNDS_MARGIN_Y
+      let maxY = h - halfHeight - BOUNDS_MARGIN_Y
 
       // While the open pill is being *dragged* we let it reach the edges
       // freely — chips may overflow off-screen during the drag, but that's
@@ -338,10 +339,10 @@ export function stepPhysics(input: PhysicsStepInput): void {
           if (-r.t > extTop)    extTop    = -r.t
           if ( r.b > extBottom) extBottom =  r.b
         }
-        minX = extLeft + BOUNDS_MARGIN
-        maxX = w - extRight - BOUNDS_MARGIN
-        minY = extTop + BOUNDS_MARGIN
-        maxY = h - extBottom - BOUNDS_MARGIN
+        minX = extLeft + BOUNDS_MARGIN_X
+        maxX = w - extRight - BOUNDS_MARGIN_X
+        minY = extTop + BOUNDS_MARGIN_Y
+        maxY = h - extBottom - BOUNDS_MARGIN_Y
       }
 
       // Guard against negative ranges (canvas smaller than the footprint).

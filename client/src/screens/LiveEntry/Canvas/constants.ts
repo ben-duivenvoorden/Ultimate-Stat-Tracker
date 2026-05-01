@@ -53,6 +53,11 @@ export const SWEEP_DURATION_MS = 400
 export const SWEEP_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)'
 
 // Soft bounds inset — distance kept clear between the pill (or chip
-// footprint) and the canvas edge. Smaller value = pills land closer to
-// the screen borders.
-export const BOUNDS_MARGIN = 15
+// footprint) and the canvas edge. Horizontal margin is tighter than
+// vertical so pills can hug the left/right edges where there's nothing
+// else competing for space (drawers handle their own width via flex).
+export const BOUNDS_MARGIN_X = 5
+export const BOUNDS_MARGIN_Y = 15
+// Kept for API compatibility with anything still importing the original
+// uniform constant.
+export const BOUNDS_MARGIN = BOUNDS_MARGIN_Y
