@@ -1,0 +1,78 @@
+import type { DerivedGameState, RecordingOptions } from '@/core/types'
+import { canRecord } from '@/core/engine'
+import { Label } from '@/components/ui/Label'
+import { Btn } from '@/components/ui/Btn'
+import { Drawer } from './Drawer'
+
+interface AdminDrawerProps {
+  state: DerivedGameState
+  recordingOptions: RecordingOptions
+  expanded: boolean
+  onToggle: () => void
+  onTimeout:    () => void
+  onFoul:       () => void
+  onPick:       () => void
+  onInjurySub:  () => void
+  onHalfTime:   () => void
+  onEndGame:    () => void
+}
+
+export const ADMIN_DRAWER_W = 220
+
+export function AdminDrawer({
+  state, recordingOptions, expanded, onToggle,
+  onTimeout, onFoul, onPick, onInjurySub, onHalfTime, onEndGame,
+}: AdminDrawerProps) {
+  const can = (t: Parameters<typeof canRecord>[1]) => canRecord(state, t)
+
+  return (
+    <Drawer
+      side="left"
+      expanded={expanded}
+      width={ADMIN_DRAWER_W}
+      onToggle={onToggle}
+      rail={<AdminRailIcon />}
+    >
+      <div
+        className="flex-shrink-0 h-7 flex items-center justify-center px-2.5"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
+        <Label>STOPPAGES</Label>
+      </div>
+
+      <div className="flex-1 p-1.5 flex flex-col gap-1.5 overflow-y-auto">
+        <Btn variant="warn"  size="sm" full disabled={!can('injury-sub')} onClick={onInjurySub}>Injury Sub</Btn>
+        <Btn variant="ghost" size="sm" full disabled={!can('timeout')}    onClick={onTimeout}>Timeout</Btn>
+        {recordingOptions.foul && (
+          <Btn variant="ghost" size="sm" full disabled={!can('foul')} onClick={onFoul}>Foul</Btn>
+        )}
+        {recordingOptions.pick && (
+          <Btn variant="ghost" size="sm" full disabled={!can('pick')} onClick={onPick}>Pick</Btn>
+        )}
+
+        <div className="h-px my-1" style={{ background: 'var(--color-border)' }} />
+
+        {/*
+          TODO(canvas): the post-goal flow now auto-navigates to LineSelection
+          (see plan decision 12), so manual Half-Time / End-Game become
+          unreachable from the canvas (they require gamePhase === 'in-play' or
+          'awaiting-pull'). The engine still auto-emits Half-Time at the score
+          threshold, so this is rarely a problem in practice — but the manual
+          buttons are kept here, perma-disabled, until a follow-up redesign
+          decides where they should live.
+        */}
+        <Btn variant="ghost" size="sm" full disabled onClick={onHalfTime}>Half Time</Btn>
+        <Btn variant="ghost" size="sm" full disabled onClick={onEndGame}>End Game</Btn>
+      </div>
+    </Drawer>
+  )
+}
+
+function AdminRailIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden>
+      <circle cx="7" cy="7" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="7" cy="7" r="0.9" />
+    </svg>
+  )
+}

@@ -1,197 +1,220 @@
-import { useSession, useDerivedState, useVisLog, useGameActions, useUiState, useRecordingOptions } from '@/core/selectors'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  useSession, useDerivedState, useVisLog, useGameActions, useUiState, useRecordingOptions,
+} from '@/core/selectors'
 import { useGameStore } from '@/core/store'
-import { otherTeam, type PlayerId } from '@/core/types'
+import { otherTeam, type Player, type TeamId, type VisLogEntry } from '@/core/types'
 import { isPickMode, pickActiveTeam } from '@/core/pickModes'
-import { lastDeadDiscEvent } from '@/core/format'
-import { PlayerPane, type PlayerPaneMode } from './PlayerPane'
-import { ActionPane } from './ActionPane'
-import { LogPane } from './LogPane'
-import type { TerminalPanelProps } from './TerminalPanel'
+import { Header } from './Header'
+import { Stage, type StageMode } from './Canvas/Stage'
+import type { PassArrowSpec } from './Canvas/PassArrowLayer'
+import type { ChipAction } from './Canvas/layout'
+import { LogDrawer, LOG_DRAWER_W } from './Drawers/LogDrawer'
+import { AdminDrawer, ADMIN_DRAWER_W } from './Drawers/AdminDrawer'
+import { DRAWER_RAIL_W } from './Drawers/Drawer'
+import { useStageSize } from './Canvas/useStageSize'
+import { Btn } from '@/components/ui/Btn'
+
+// Derive pass arrows for the active team from the current point's possessions.
+// Each consecutive pair of possessions on this team becomes a from→to arrow.
+// Returns the most recent N arrows (newest last).
+function derivePassArrows(
+  visLog: VisLogEntry[],
+  teamId: TeamId,
+  players: Player[],
+  maxArrows = 2,
+): PassArrowSpec[] {
+  let startIdx = 0
+  for (let i = visLog.length - 1; i >= 0; i--) {
+    if (visLog[i].type === 'point-start') { startIdx = i; break }
+  }
+  const possessions = visLog.slice(startIdx).filter(
+    (e): e is Extract<VisLogEntry, { type: 'possession' }> =>
+      e.type === 'possession' && e.teamId === teamId,
+  )
+  const arrows: PassArrowSpec[] = []
+  for (let i = 1; i < possessions.length; i++) {
+    const fromIdx = players.findIndex(p => p.id === possessions[i - 1].playerId)
+    const toIdx   = players.findIndex(p => p.id === possessions[i].playerId)
+    if (fromIdx >= 0 && toIdx >= 0) arrows.push({ fromIdx, toIdx })
+  }
+  return arrows.slice(-maxArrows)
+}
+
+const HEADER_H     = 48      // h-12
+const PICK_STRIP_H = 32      // h-8
 
 export default function LiveEntry() {
-  const session         = useSession()
-  const state           = useDerivedState()
-  const visLog          = useVisLog()
-  const ui              = useUiState()
-  const actions         = useGameActions()
+  // ── All hooks declared up front (no conditional hooks) ───────────────────
+  const session          = useSession()
+  const state            = useDerivedState()
+  const visLog           = useVisLog()
+  const ui               = useUiState()
+  const actions          = useGameActions()
   const recordingOptions = useRecordingOptions()
-  const backToGameList  = useGameStore(s => s.backToGameList)
+  const swapSides        = useGameStore(s => s.swapSides)
+  const stageSize        = useStageSize()
 
-  if (!session || !state) return null
+  const [logExpanded, setLogExpanded]     = useState(false)
+  const [adminExpanded, setAdminExpanded] = useState(false)
 
-  const { teams } = session.gameConfig
-  const { gameStartPullingTeam } = session
+  // Active context — derived even when state is null so all hooks below can
+  // run unconditionally. Default values are inert (null active team, empty
+  // arrows, etc.) and the early return below the hooks guards rendering.
+  const phase   = state?.gamePhase
+  const pickMode = isPickMode(ui.uiMode) ? ui.uiMode : null
 
-  const pickMode    = isPickMode(ui.uiMode) ? ui.uiMode : null
-  const isPullPhase = state.gamePhase === 'awaiting-pull'
-  const isTerminal  = state.gamePhase === 'point-over' || state.gamePhase === 'half-time' || state.gamePhase === 'game-over'
-
-  // Which team's players are "active" (shown, interactable)
-  const activeTeam = pickMode
-    ? pickActiveTeam(pickMode, state.possession)
-    : isPullPhase
-      ? otherTeam(state.possession)
-      : state.possession
-
-  const playerMode: PlayerPaneMode = pickMode ?? (isPullPhase ? 'pull' : 'normal')
-
-  const allPlayers     = [...session.gameConfig.rosters.A, ...session.gameConfig.rosters.B]
-  const lookupName     = (id: PlayerId | null): string | null =>
-    id !== null ? (allPlayers.find(p => p.id === id)?.name ?? String(id)) : null
-  const discHolderName = lookupName(state.discHolder)
-  const selPullerName  = lookupName(ui.selPuller)
-  const goalScorerName = isTerminal
-    ? lookupName([...visLog].reverse().find(e => e.type === 'goal')?.playerId ?? null)
+  const activeTeam: TeamId | null = state
+    ? (pickMode
+        ? pickActiveTeam(pickMode, state.possession)
+        : phase === 'awaiting-pull'
+          ? otherTeam(state.possession)
+          : state.possession)
     : null
 
-  const terminalProps: TerminalPanelProps = {
-    gamePhase:            state.gamePhase,
-    score:                state.score,
-    goalScorerName:       goalScorerName ?? undefined,
-    teamAName:            teams.A.name,
-    teamBName:            teams.B.name,
-    teamAColor:           teams.A.color,
-    teamBColor:           teams.B.color,
-    gameStartPullingTeam: gameStartPullingTeam,
-    onNext:               actions.nextPoint,
-    onBackToGames:        actions.backToGameList,
+  const activePlayers = useMemo<Player[]>(
+    () => (state && activeTeam ? state.activeLine[activeTeam] : []),
+    [state, activeTeam],
+  )
+
+  const arrows = useMemo(
+    () => (activeTeam ? derivePassArrows(visLog, activeTeam, activePlayers) : []),
+    [visLog, activeTeam, activePlayers],
+  )
+
+  // Auto-navigate to LineSelection after a goal or half-time. game-over stays
+  // on the canvas with an inline banner (no end-game screen yet).
+  useEffect(() => {
+    if (phase === 'point-over' || phase === 'half-time') actions.nextPoint()
+  }, [phase, actions])
+
+  if (!session || !state || !activeTeam) return null
+
+  const { teams } = session.gameConfig
+  const stageMode: StageMode = pickMode
+    ? 'pick'
+    : phase === 'awaiting-pull'
+      ? 'awaiting-pull'
+      : 'in-play'
+
+  const ineligibleIds = pickMode === 'receiver-error-pick' && state.discHolder !== null
+    ? [state.discHolder]
+    : []
+
+  // Logical canvas centre — shifted to compensate for any expanded drawer so
+  // chips at the canvas edge stay on-screen.
+  const headerH = HEADER_H + (pickMode ? PICK_STRIP_H : 0)
+  const stageW  = stageSize.w
+  const stageH  = Math.max(0, stageSize.h - headerH)
+  const leftOffset  = adminExpanded ? (ADMIN_DRAWER_W - DRAWER_RAIL_W) : 0
+  const rightOffset = logExpanded   ? (LOG_DRAWER_W   - DRAWER_RAIL_W) : 0
+  const cx = stageW / 2 + leftOffset / 2 - rightOffset / 2
+  const cy = stageH / 2
+
+  // ─── Pill / chip dispatchers ────────────────────────────────────────────────
+  const onPillTap = (player: Player) => {
+    // tapPlayer in the engine covers all three flows: pick-mode dispatch,
+    // puller-toggle in awaiting-pull, and auto-possession in in-play.
+    actions.tapPlayer(player)
   }
 
-  // Layout: [team-on-left-pane | team-on-centre-pane | Log].
-  // swapSides flips which physical side each team is on (used when teams
-  // change ends or the scorer walks around the field).
-  const swapSides   = useGameStore(s => s.swapSides)
-  const toggleSwap  = useGameStore(s => s.toggleSwapSides)
-  const teamLeft    = swapSides ? 'B' : 'A'
-  const teamCentre  = swapSides ? 'A' : 'B'
-
-  // Action pane covers the *inactive* team. translateX(0%) sits over the left
-  // pane; translateX(100%) shifts to the centre pane.
-  const actionTranslateX = activeTeam === teamLeft ? '100%' : '0%'
-
-  const sharedPlayerPaneProps = {
-    discHolderId: state.discHolder,
-    selPullerId:  ui.selPuller,
-    onTap:        actions.tapPlayer,
+  const onChipTap = (_player: Player, action: ChipAction) => {
+    switch (action.kind) {
+      case 'pull':            actions.recordPull(action.bonus); break
+      case 'throwaway':       actions.recordThrowAway();        break
+      case 'goal':            actions.recordGoal();             break
+      case 'stall':           actions.recordStall();            break
+      case 'def-block':       actions.triggerDefBlock(action.type); break
+      case 'receiver-error':  actions.triggerReceiverError();   break
+    }
   }
+
+  const onBackgroundTap = () => {
+    if (pickMode) actions.cancelPickMode()
+  }
+
+  const isGameOver = phase === 'game-over'
 
   return (
-    <div className="h-full flex flex-col bg-bg">
-      {/* Top bar — back button + centred scoreboard */}
-      <div
-        className="flex-shrink-0 flex items-center justify-between px-3 h-12"
-        style={{ borderBottom: '1px solid var(--color-border)' }}
-      >
-        <button
-          onClick={backToGameList}
-          className="text-muted hover:text-content transition-colors cursor-pointer text-lg leading-none"
-          title="Back to games"
-        >
-          ←
-        </button>
-        <div className="flex-1 flex items-center justify-center gap-3">
-          <span className="text-sm font-bold" style={{ color: teams[teamLeft].color }}>{teams[teamLeft].short}</span>
-          <strong className="text-3xl font-black tabular-nums leading-none text-content">{state.score[teamLeft]}</strong>
-          <span className="text-dim text-base">–</span>
-          <strong className="text-3xl font-black tabular-nums leading-none text-content">{state.score[teamCentre]}</strong>
-          <span className="text-sm font-bold" style={{ color: teams[teamCentre].color }}>{teams[teamCentre].short}</span>
-        </div>
-        <button
-          onClick={toggleSwap}
-          className="text-muted hover:text-content transition-colors cursor-pointer text-base leading-none px-1"
-          title="Swap team sides"
-        >
-          ⇆
-        </button>
+    <div className="h-full flex flex-col" style={{ background: 'var(--color-bg)' }}>
+      <Header
+        teams={teams}
+        score={state.score}
+        swapSides={swapSides}
+        pickMode={pickMode}
+        defendingShort={teams[otherTeam(state.possession)].short}
+        onBack={actions.backToGameList}
+        onSwap={actions.toggleSwapSides}
+        onCancelPickMode={actions.cancelPickMode}
+      />
+
+      <div className="flex-1 relative overflow-hidden">
+        {isGameOver ? (
+          <GameOverBanner score={state.score} teams={teams} onBack={actions.backToGameList} />
+        ) : (
+          <Stage
+            // Re-key on team change so Stage remounts cleanly (physics + arrows reset).
+            key={activeTeam}
+            teamId={activeTeam}
+            players={activePlayers}
+            teamColor={teams[activeTeam].color}
+            mode={stageMode}
+            holderId={state.discHolder}
+            pullerId={ui.selPuller}
+            ineligibleIds={ineligibleIds}
+            stallShown={recordingOptions.stall}
+            bonusShown={recordingOptions.pullBonus}
+            arrows={arrows}
+            centre={{ x: cx, y: cy }}
+            bounds={{ w: stageW, h: stageH }}
+            onPillTap={onPillTap}
+            onChipTap={onChipTap}
+            onBackgroundTap={onBackgroundTap}
+          />
+        )}
+
+        <AdminDrawer
+          state={state}
+          recordingOptions={recordingOptions}
+          expanded={adminExpanded}
+          onToggle={() => setAdminExpanded(v => !v)}
+          onTimeout={actions.recordTimeout}
+          onFoul={actions.recordFoul}
+          onPick={actions.recordPick}
+          onInjurySub={actions.triggerInjurySub}
+          onHalfTime={actions.triggerHalfTime}
+          onEndGame={actions.triggerEndGame}
+        />
+
+        <LogDrawer
+          visLog={visLog}
+          players={[...session.gameConfig.rosters.A, ...session.gameConfig.rosters.B]}
+          expanded={logExpanded}
+          onToggle={() => setLogExpanded(v => !v)}
+          onUndo={actions.undo}
+        />
       </div>
+    </div>
+  )
+}
 
-      <div className="flex-1 flex overflow-hidden relative">
-
-        {/* Pane 1: left side */}
-        <div style={{ flex: 1, display: 'flex' }}>
-          {!isTerminal && (
-            <PlayerPane
-              {...sharedPlayerPaneProps}
-              players={state.activeLine[teamLeft]}
-              teamColor={teams[teamLeft].color}
-              teamShort={teams[teamLeft].short}
-              mode={activeTeam === teamLeft ? playerMode : 'normal'}
-              onReorder={(f, t) => actions.reorderActiveLine(teamLeft, f, t)}
-            />
-          )}
+function GameOverBanner({
+  score, teams, onBack,
+}: {
+  score: { A: number; B: number }
+  teams: Record<TeamId, { name: string; short: string; color: string }>
+  onBack: () => void
+}) {
+  const winner: TeamId = score.A >= score.B ? 'A' : 'B'
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4 px-6">
+        <div className="text-xs tracking-widest font-mono text-muted">GAME OVER</div>
+        <div className="text-5xl font-black tabular-nums" style={{ color: teams[winner].color }}>
+          {score.A} – {score.B}
         </div>
-
-        {/* Pane 2: centre, right-aligned (mirrored layout) */}
-        <div style={{ flex: 1, display: 'flex' }}>
-          {!isTerminal && (
-            <PlayerPane
-              {...sharedPlayerPaneProps}
-              players={state.activeLine[teamCentre]}
-              teamColor={teams[teamCentre].color}
-              teamShort={teams[teamCentre].short}
-              mode={activeTeam === teamCentre ? playerMode : 'normal'}
-              align="right"
-              onReorder={(f, t) => actions.reorderActiveLine(teamCentre, f, t)}
-            />
-          )}
-        </div>
-
-        {/* Pane 3: Event log — always right, never moves */}
-        <div style={{ flex: 1, display: 'flex' }}>
-          <LogPane
-            visLog={visLog}
-            players={allPlayers}
-            isGameOver={state.gamePhase === 'game-over'}
-            onUndo={actions.undo}
-            onExport={() => alert('Export coming soon')}
-          />
-        </div>
-
-        {/* Pane 4: Action pane — slides over inactive team's column.
-            In pick mode it shows PickModePlaceholder (no buttons),
-            so tapping it cancels pick mode naturally. */}
-        <div
-          style={{
-            position:   'absolute',
-            top: 0, bottom: 0, left: 0,
-            width:      'calc(100% / 3)',
-            transform:  `translateX(${actionTranslateX})`,
-            transition: 'transform 220ms ease-in-out',
-            zIndex:     10,
-            display:    'flex',
-            background: 'var(--color-bg)',
-          }}
-          onClick={pickMode ? actions.cancelPickMode : undefined}
-        >
-          <ActionPane
-            gamePhase={state.gamePhase}
-            uiMode={ui.uiMode}
-            pullerSelected={ui.selPuller !== null}
-            discHolderName={discHolderName}
-            selPullerName={selPullerName}
-            defendingShort={teams[otherTeam(state.possession)].short}
-            recordingOptions={recordingOptions}
-            deadDiscEvent={lastDeadDiscEvent(visLog)}
-            onRecordPull={actions.recordPull}
-            onThrowAway={actions.recordThrowAway}
-            onReceiverError={actions.triggerReceiverError}
-            onDefensiveBlock={actions.triggerDefBlock}
-            onGoal={actions.recordGoal}
-            onHalfTime={actions.triggerHalfTime}
-            onEndGame={actions.triggerEndGame}
-            onInjurySub={actions.triggerInjurySub}
-            onStall={actions.recordStall}
-            onFoul={actions.recordFoul}
-            onPick={actions.recordPick}
-            onTimeout={actions.recordTimeout}
-            onCancelPickMode={actions.cancelPickMode}
-            showEventMenu={ui.showEventMenu}
-            setShowEventMenu={actions.setShowEventMenu}
-            terminalProps={terminalProps}
-          />
-        </div>
-
-
+        <div className="text-sm text-muted">{teams[winner].name} wins</div>
+        <Btn variant="ghost" size="md" onClick={onBack}>Back to games</Btn>
       </div>
     </div>
   )

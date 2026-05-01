@@ -1,28 +1,35 @@
-import { useRef, useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { VisLogEntry, Player } from '@/core/types'
+import { formatVisLogEntry, getVisLogColor, isMutedLogEntry } from '@/core/format'
 import { Label } from '@/components/ui/Label'
 import { Btn } from '@/components/ui/Btn'
-import { formatVisLogEntry, getVisLogColor, isMutedLogEntry } from '@/core/format'
+import { Drawer } from './Drawer'
 
-interface LogPaneProps {
+interface LogDrawerProps {
   visLog: VisLogEntry[]
   players: Player[]
-  isGameOver: boolean
+  expanded: boolean
+  onToggle: () => void
   onUndo: () => void
-  onExport?: () => void
 }
 
-export function LogPane({ visLog, players, isGameOver, onUndo, onExport }: LogPaneProps) {
+export const LOG_DRAWER_W = 280
+
+export function LogDrawer({ visLog, players, expanded, onToggle, onUndo }: LogDrawerProps) {
   const logRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight
-    }
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
   }, [visLog.length])
 
   return (
-    <div className="flex-1 flex flex-col" style={{ minWidth: 0 }}>
+    <Drawer
+      side="right"
+      expanded={expanded}
+      width={LOG_DRAWER_W}
+      onToggle={onToggle}
+      rail={<LogRailIcon />}
+    >
       <div
         className="flex-shrink-0 h-7 flex items-center justify-center px-2.5"
         style={{ borderBottom: '1px solid var(--color-border)' }}
@@ -56,12 +63,18 @@ export function LogPane({ visLog, players, isGameOver, onUndo, onExport }: LogPa
       </div>
 
       <div className="flex-shrink-0 p-1.5" style={{ borderTop: '1px solid var(--color-border)' }}>
-        {isGameOver ? (
-          <Btn variant="primary" size="sm" full onClick={onExport}>Export Stats</Btn>
-        ) : (
-          <Btn variant="ghost" size="sm" full onClick={onUndo}>↩ Undo</Btn>
-        )}
+        <Btn variant="ghost" size="sm" full onClick={onUndo}>↩ Undo</Btn>
       </div>
-    </div>
+    </Drawer>
+  )
+}
+
+function LogRailIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden>
+      <rect x="2" y="3" width="10" height="1.4" rx="0.7" />
+      <rect x="2" y="6.3" width="10" height="1.4" rx="0.7" />
+      <rect x="2" y="9.6" width="10" height="1.4" rx="0.7" />
+    </svg>
   )
 }
