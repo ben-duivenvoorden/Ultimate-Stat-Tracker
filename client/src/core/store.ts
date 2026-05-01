@@ -49,6 +49,7 @@ interface GameStore {
   // Recording actions (all funnel through canRecord guards)
   tapPlayer:            (player: Player) => void
   recordPull:           (bonus?: boolean) => void
+  recordBrick:          () => void
   recordThrowAway:      () => void
   triggerReceiverError: () => void
   recordGoal:           () => void
@@ -252,6 +253,28 @@ export const useGameStore = create<GameStore>()(
           session: appendEvents(session, [{
             pointIndex: state.pointIndex,
             type:     bonus ? 'pull-bonus' : 'pull',
+            playerId: selPuller,
+            teamId:   pullingTeam,
+          }]),
+          selPuller: null,
+        })
+      },
+
+      // ── recordBrick ─────────────────────────────────────────────────────────
+      // Pull went out of bounds. Receiving team takes the disc at the brick
+      // mark — engine-wise this transitions to in-play just like pull, the
+      // difference is purely the recorded event type (for stats / reporting).
+      recordBrick() {
+        const { session, selPuller } = get()
+        if (!session || !selPuller) return
+        const state = deriveGameState(session)
+        if (!canRecord(state, 'brick')) return
+
+        const pullingTeam = otherTeam(state.possession)
+        set({
+          session: appendEvents(session, [{
+            pointIndex: state.pointIndex,
+            type:     'brick',
             playerId: selPuller,
             teamId:   pullingTeam,
           }]),

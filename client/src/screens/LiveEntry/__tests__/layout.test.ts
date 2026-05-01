@@ -57,16 +57,18 @@ describe('buildActions — in-play (stall shown)', () => {
 })
 
 describe('buildActions — awaiting-pull', () => {
-  it('returns Pull only when bonus is hidden', () => {
+  it('returns Pull + Brick when bonus is hidden', () => {
     const chips = buildActions(40, { phase: 'awaiting-pull', bonusShown: false })
-    expect(chips.map(c => c.id)).toEqual(['pull'])
-    expect(chips[0].label).toBe(CHIP_LABELS.pull)
+    expect(chips.map(c => c.id).sort()).toEqual(['brick', 'pull'])
+    expect(chips.find(c => c.id === 'pull')!.label).toBe(CHIP_LABELS.pull)
+    expect(chips.find(c => c.id === 'brick')!.ax).toBeLessThan(0)  // brick on the left
   })
 
-  it('returns Pull + Pull Bonus when bonus is shown', () => {
+  it('returns Pull + Brick + Pull Bonus when bonus is shown', () => {
     const chips = buildActions(40, { phase: 'awaiting-pull', bonusShown: true })
-    expect(chips.map(c => c.id)).toEqual(['pull', 'pull-bonus'])
+    expect(chips.map(c => c.id).sort()).toEqual(['brick', 'pull', 'pull-bonus'])
     expect(chips.find(c => c.id === 'pull-bonus')!.ax).toBeGreaterThan(0)
+    expect(chips.find(c => c.id === 'brick')!.ax).toBeLessThan(0)
   })
 })
 

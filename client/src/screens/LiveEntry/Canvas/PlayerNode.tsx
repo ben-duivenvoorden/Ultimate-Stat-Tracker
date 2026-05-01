@@ -48,6 +48,7 @@ function chipIdToVisType(id: ChipId): VisLogEntry['type'] | null {
   switch (id) {
     case 'pull':         return 'pull'
     case 'pull-bonus':   return 'pull-bonus'
+    case 'brick':        return 'brick'
     case 'rec':          return 'turnover-receiver-error'
     case 'tw':           return 'turnover-throw-away'
     case 'st':           return 'turnover-stall'

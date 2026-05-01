@@ -15,27 +15,37 @@ import { DRAWER_RAIL_W } from './Drawers/Drawer'
 import { useStageSize } from './Canvas/useStageSize'
 import { Btn } from '@/components/ui/Btn'
 
-// Derive pass arrows for the active team from the current point's possessions.
-// Each consecutive pair of possessions on this team becomes a from→to arrow.
-// Returns the most recent N arrows (newest last).
+// Derive pass arrows for the active team's *current* possession run.
+//
+// Walks the visLog backwards collecting consecutive `possession` events for
+// `teamId`. Any other event (a turnover, block, intercept, pull/brick, the
+// other team's possession, or point-start) breaks the chain — so as soon as
+// the team loses possession, prior arrows are cleared. When they regain it
+// later in the same point, only the new run shows.
+//
+// Returns at most `maxArrows` most recent arrows (newest last).
 function derivePassArrows(
   visLog: VisLogEntry[],
   teamId: TeamId,
   players: Player[],
   maxArrows = 2,
 ): PassArrowSpec[] {
-  let startIdx = 0
+  type Possession = Extract<VisLogEntry, { type: 'possession' }>
+  const chain: Possession[] = []
   for (let i = visLog.length - 1; i >= 0; i--) {
-    if (visLog[i].type === 'point-start') { startIdx = i; break }
+    const e = visLog[i]
+    if (e.type === 'possession' && e.teamId === teamId) {
+      chain.push(e)
+    } else {
+      break
+    }
   }
-  const possessions = visLog.slice(startIdx).filter(
-    (e): e is Extract<VisLogEntry, { type: 'possession' }> =>
-      e.type === 'possession' && e.teamId === teamId,
-  )
+  chain.reverse()
+
   const arrows: PassArrowSpec[] = []
-  for (let i = 1; i < possessions.length; i++) {
-    const fromIdx = players.findIndex(p => p.id === possessions[i - 1].playerId)
-    const toIdx   = players.findIndex(p => p.id === possessions[i].playerId)
+  for (let i = 1; i < chain.length; i++) {
+    const fromIdx = players.findIndex(p => p.id === chain[i - 1].playerId)
+    const toIdx   = players.findIndex(p => p.id === chain[i].playerId)
     if (fromIdx >= 0 && toIdx >= 0) arrows.push({ fromIdx, toIdx })
   }
   return arrows.slice(-maxArrows)
@@ -130,6 +140,7 @@ export default function LiveEntry() {
   const onChipTap = (_player: Player, action: ChipAction) => {
     switch (action.kind) {
       case 'pull':            actions.recordPull(action.bonus); break
+      case 'brick':           actions.recordBrick();            break
       case 'throwaway':       actions.recordThrowAway();        break
       case 'goal':            actions.recordGoal();             break
       case 'stall':           actions.recordStall();            break

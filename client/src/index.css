@@ -42,6 +42,9 @@
   /* Pull + Pull Bonus: same hue (team blue), different shades. Bonus is the
    * lighter sibling so the two pull chips read as related but distinct. */
   --color-pull-bonus:    #6a8cc8;
+  /* Brick is a different category (out-of-bounds pull) so it gets its own
+   * hue — terracotta — to read clearly against Pull / Pull Bonus blues. */
+  --color-brick:         #c1693d;
 
   /* Typography */
   --font-sans: 'Roboto', sans-serif;

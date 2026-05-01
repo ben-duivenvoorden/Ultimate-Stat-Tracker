@@ -120,9 +120,13 @@ export function deriveGameState(session: GameSession): DerivedGameState {
 
       case 'pull':
       case 'pull-bonus':
+      case 'brick':
         state.gamePhase = 'in-play'
         state.discHolder = null
-        // possession is already the receiving team — pull doesn't change it
+        // possession is already the receiving team — none of these change it.
+        // (A brick goes out of bounds; the receiving team takes possession at
+        // the brick mark, so the receiving-team assignment from point-start
+        // still stands.)
         break
 
       case 'possession':
@@ -255,6 +259,7 @@ export function canRecord(state: DerivedGameState, eventType: RawEventType): boo
 
     case 'pull':
     case 'pull-bonus':
+    case 'brick':
       return state.gamePhase === 'awaiting-pull'
 
     case 'possession':

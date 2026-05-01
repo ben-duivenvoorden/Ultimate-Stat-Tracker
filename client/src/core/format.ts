@@ -18,6 +18,7 @@ export function formatVisLogEntry(entry: VisLogEntry, players: Player[]): string
     }
     case 'pull':                     return `Pull — ${name(entry.playerId)}`
     case 'pull-bonus':               return `Pull Bonus — ${name(entry.playerId)}`
+    case 'brick':                    return `Brick — ${name(entry.playerId)}`
     case 'possession':               return `Possession: ${name(entry.playerId)}`
     case 'turnover-throw-away':      return `Throw Away — ${name(entry.playerId)}`
     case 'turnover-receiver-error':  return `Receiver Error — ${name(entry.playerId)}`
@@ -41,6 +42,8 @@ export function getVisLogColor(type: VisLogEntry['type']): string {
       return 'var(--color-team-a)'
     case 'pull-bonus':
       return 'var(--color-pull-bonus)'
+    case 'brick':
+      return 'var(--color-brick)'
     case 'possession':
       return 'var(--color-muted)'
     case 'turnover-throw-away':
@@ -75,7 +78,7 @@ export function isMutedLogEntry(type: VisLogEntry['type']): boolean {
 // Events that put the game into a "dead disc / waiting for pickup" state
 // (gamePhase = 'in-play' with no discHolder).
 export type DeadDiscEventType =
-  | 'pull' | 'pull-bonus'
+  | 'pull' | 'pull-bonus' | 'brick'
   | 'turnover-throw-away' | 'turnover-receiver-error' | 'turnover-stall'
   | 'block'
 
@@ -83,6 +86,7 @@ export function deadDiscLabel(type: DeadDiscEventType): string {
   switch (type) {
     case 'pull':
     case 'pull-bonus':              return 'DEAD DISC AFTER PULL'
+    case 'brick':                   return 'DEAD DISC AFTER BRICK'
     case 'turnover-throw-away':     return 'DEAD DISC AFTER THROW AWAY'
     case 'turnover-receiver-error': return 'DEAD DISC AFTER RECEIVER ERROR'
     case 'turnover-stall':          return 'DEAD DISC AFTER STALL'
@@ -93,7 +97,7 @@ export function deadDiscLabel(type: DeadDiscEventType): string {
 export function lastDeadDiscEvent(visLog: VisLogEntry[]): DeadDiscEventType | null {
   for (let i = visLog.length - 1; i >= 0; i--) {
     const t = visLog[i].type
-    if (t === 'pull' || t === 'pull-bonus'
+    if (t === 'pull' || t === 'pull-bonus' || t === 'brick'
      || t === 'turnover-throw-away' || t === 'turnover-receiver-error' || t === 'turnover-stall'
      || t === 'block') {
       return t

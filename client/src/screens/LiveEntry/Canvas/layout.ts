@@ -8,6 +8,7 @@ import { rectExitDist, type ChipSpec, type ChipAlign } from './physics'
 export const CHIP_LABELS = {
   pull:         'Pull',
   'pull-bonus': 'Pull Bonus',
+  brick:        'Brick',
   rec:          'Receiver Error',
   goal:         'Goal',
   tw:           'Throwaway',
@@ -78,7 +79,13 @@ function rayAnchor(id: ChipId, angle: number, HW: number): ChipSpec {
 // clearance so they sit at a uniform visible distance from the pill.
 export function buildActions(HW: number, opts: BuildOpts): ChipSpec[] {
   if (opts.phase === 'awaiting-pull') {
-    const chips: ChipSpec[] = [rayAnchor('pull', -Math.PI / 2, HW)]
+    // Pull at top, Brick on the left, Pull Bonus on the right (when shown).
+    // Three axial positions keep each chip on its own side, which scales
+    // cleanly whether or not Pull Bonus is enabled.
+    const chips: ChipSpec[] = [
+      rayAnchor('pull',  -Math.PI / 2, HW),
+      rayAnchor('brick',  Math.PI,     HW),
+    ]
     if (opts.bonusShown) chips.push(rayAnchor('pull-bonus', 0, HW))
     return chips
   }
@@ -103,6 +110,7 @@ export function buildActions(HW: number, opts: BuildOpts): ChipSpec[] {
 // Map a ChipId to the engine action that should run when the chip is tapped.
 export type ChipAction =
   | { kind: 'pull';        bonus: boolean }
+  | { kind: 'brick' }
   | { kind: 'throwaway' }
   | { kind: 'goal' }
   | { kind: 'stall' }
@@ -113,6 +121,7 @@ export function chipAction(id: ChipId): ChipAction {
   switch (id) {
     case 'pull':        return { kind: 'pull',     bonus: false }
     case 'pull-bonus':  return { kind: 'pull',     bonus: true }
+    case 'brick':       return { kind: 'brick' }
     case 'tw':          return { kind: 'throwaway' }
     case 'goal':        return { kind: 'goal' }
     case 'st':          return { kind: 'stall' }

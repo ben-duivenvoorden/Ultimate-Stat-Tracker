@@ -40,6 +40,7 @@ export type RawEventType =
   | 'point-start'              // marks the start of a new point (between goal and pull)
   | 'pull'
   | 'pull-bonus'
+  | 'brick'                    // pull went out of bounds — receiving team takes it at the brick mark
   | 'possession'
   | 'turnover-throw-away'
   | 'turnover-receiver-error'
@@ -67,7 +68,7 @@ interface BaseRawEvent {
 // Point-start carries the agreed line-up for both teams. Engine reconstructs
 // activeLine on derivation; the line is no longer stored on the session.
 export interface PointStartRawEvent extends BaseRawEvent { type: 'point-start'; lineA: PlayerId[]; lineB: PlayerId[] }
-export interface PullRawEvent       extends BaseRawEvent { type: 'pull' | 'pull-bonus'; playerId: PlayerId; teamId: TeamId }
+export interface PullRawEvent       extends BaseRawEvent { type: 'pull' | 'pull-bonus' | 'brick'; playerId: PlayerId; teamId: TeamId }
 export interface PossessionRawEvent extends BaseRawEvent { type: 'possession';          playerId: PlayerId; teamId: TeamId }
 export interface TurnoverRawEvent   extends BaseRawEvent { type: 'turnover-throw-away' | 'turnover-receiver-error' | 'turnover-stall'; playerId: PlayerId; teamId: TeamId }
 export interface BlockRawEvent      extends BaseRawEvent { type: 'block' | 'intercept'; playerId: PlayerId; teamId: TeamId }
