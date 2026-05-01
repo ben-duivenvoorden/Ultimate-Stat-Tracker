@@ -243,12 +243,23 @@ export function Stage(props: StageProps) {
       dragInfo.current.idx = -1
       setDragIdx(-1)
       if (wasDrag) {
+        // Swallow the synthetic click that follows mouseup so the drop site
+        // doesn't immediately register as a tap. If no click fires (release
+        // on a non-clickable area), tear the listener down on a short timer
+        // so the *next* genuine tap isn't eaten.
+        let removed = false
+        const cleanup = () => {
+          if (removed) return
+          removed = true
+          document.removeEventListener('click', swallow, true)
+        }
         const swallow = (ev: Event) => {
           ev.stopPropagation()
           ev.preventDefault()
-          document.removeEventListener('click', swallow, true)
+          cleanup()
         }
         document.addEventListener('click', swallow, true)
+        setTimeout(cleanup, 200)
       }
       document.removeEventListener('mousemove',  onMove, true)
       document.removeEventListener('mouseup',    onEnd,  true)
