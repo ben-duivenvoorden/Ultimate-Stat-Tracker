@@ -13,11 +13,13 @@ interface ActionChipProps {
   fill: string
   /** Border + text colour. */
   accent: string
+  /** When true the chip renders dimmed and ignores taps. */
+  disabled?: boolean
   onTap: (id: ChipId) => void
 }
 
 export function ActionChip({
-  id, label, ax, ay, align, visible, delay, fill, accent, onTap,
+  id, label, ax, ay, align, visible, delay, fill, accent, disabled = false, onTap,
 }: ActionChipProps) {
   let tx = '-50%', ty = '-50%'
   if (align === 'left-center')   { tx = '0%';    ty = '-50%' }
@@ -30,7 +32,7 @@ export function ActionChip({
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
-      onClick={(e) => { e.stopPropagation(); onTap(id) }}
+      onClick={(e) => { e.stopPropagation(); if (!disabled) onTap(id) }}
       style={{
         position: 'absolute',
         left: '50%', top: '50%',
@@ -39,8 +41,9 @@ export function ActionChip({
           : `translate(0px, 0px) translate(-50%, -50%) scale(0.5)`,
         // Slightly translucent so pass arrows are visible passing under
         // chips, but legibility is preserved. Chips still sit above the
-        // arrow layer (z-index inherited from PlayerNode).
-        opacity: visible ? 0.95 : 0,
+        // arrow layer (z-index inherited from PlayerNode). Disabled chips
+        // dim further so they read as un-tappable.
+        opacity: visible ? (disabled ? 0.4 : 0.95) : 0,
         transition: visible
           ? `transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms, opacity 160ms ease ${delay}ms`
           : 'transform 140ms ease, opacity 120ms ease',
@@ -54,7 +57,7 @@ export function ActionChip({
         whiteSpace: 'nowrap',
         userSelect: 'none',
         WebkitUserSelect: 'none',
-        cursor: 'pointer',
+        cursor: disabled ? 'default' : 'pointer',
       }}
     >
       {label}

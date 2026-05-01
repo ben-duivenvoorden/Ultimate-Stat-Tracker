@@ -16,6 +16,10 @@ interface PlayerNodeProps {
   isOpen: boolean
   dragging: boolean
   ineligible: boolean
+  /** Chip ids that should render dimmed and ignore taps (e.g. Goal /
+   *  Receiver Error during a fresh possession before any pass has been
+   *  recorded). */
+  disabledChipIds?: ReadonlySet<ChipId>
   /** Always-mounted chip set for this pill (driven by holder/puller status,
    *  empty otherwise). Visibility is governed by `isOpen` so the CSS
    *  transition can run from invisible→visible when the pill is opened. */
@@ -62,7 +66,7 @@ function chipIdToVisType(id: ChipId): VisLogEntry['type'] | null {
 
 export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function PlayerNode(
   { name, teamColor, scale, isHolder, isPuller, isOpen, dragging, ineligible, chips,
-    onMouseDown, onTouchStart, onClick, onChipClick, onMeasureWidth }, ref,
+    disabledChipIds, onMouseDown, onTouchStart, onClick, onChipClick, onMeasureWidth }, ref,
 ) {
   const display = pillLabel(name)
   const pillRef = useRef<HTMLDivElement | null>(null)
@@ -116,6 +120,7 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
           delay={isOpen ? i * 28 : 0}
           fill={chipFill(a.id as ChipId)}
           accent={chipAccent(a.id as ChipId)}
+          disabled={disabledChipIds?.has(a.id as ChipId) ?? false}
           onTap={onChipClick}
         />
       ))}

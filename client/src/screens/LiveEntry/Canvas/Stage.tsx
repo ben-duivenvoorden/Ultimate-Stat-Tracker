@@ -6,6 +6,7 @@ import {
   type ChipSpec, type Vec,
 } from './physics'
 import { buildActions, chipAction, type ChipAction, type ChipId } from './layout'
+type DisabledChipIds = ReadonlySet<ChipId>
 import { PlayerNode } from './PlayerNode'
 import { PassArrowLayer, type PassArrowSpec, type ArrowNodeRefs } from './PassArrowLayer'
 
@@ -34,6 +35,10 @@ export interface StageProps {
   /** Per-device pill-size preference (sm / md / lg). Scales pill dimensions
    *  and the physics half-height in lockstep. */
   pillSize: PillSize
+
+  /** Chip ids that should render dimmed + un-tappable (e.g. Goal / Receiver
+   *  Error during a fresh possession run before any pass has been made). */
+  disabledChipIds: DisabledChipIds
 
   /** Pass arrows to render on this stage; from/to indices match `players`. */
   arrows: PassArrowSpec[]
@@ -282,6 +287,7 @@ export function Stage(props: StageProps) {
   }
 
   function onChipTap(player: Player, id: ChipId) {
+    if (props.disabledChipIds.has(id)) return
     setOpenIdx(-1)
     props.onChipTap(player, chipAction(id))
   }
@@ -313,6 +319,7 @@ export function Stage(props: StageProps) {
             name={p.name}
             teamColor={props.teamColor}
             scale={scale}
+            disabledChipIds={props.disabledChipIds}
             isHolder={isHolder}
             isPuller={isPuller}
             isOpen={isOpen}

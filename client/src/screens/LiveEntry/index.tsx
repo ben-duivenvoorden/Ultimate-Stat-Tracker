@@ -8,12 +8,34 @@ import { isPickMode, pickActiveTeam } from '@/core/pickModes'
 import { Header } from './Header'
 import { Stage, type StageMode } from './Canvas/Stage'
 import type { PassArrowSpec } from './Canvas/PassArrowLayer'
-import type { ChipAction } from './Canvas/layout'
+import type { ChipAction, ChipId } from './Canvas/layout'
 import { LogDrawer, LOG_DRAWER_W } from './Drawers/LogDrawer'
 import { AdminDrawer, ADMIN_DRAWER_W } from './Drawers/AdminDrawer'
 import { DRAWER_RAIL_W } from './Drawers/Drawer'
 import { useStageSize } from './Canvas/useStageSize'
 import { Btn } from '@/components/ui/Btn'
+
+// True until the active team's possession run has at least 2 recorded
+// possession events — i.e. the current holder hasn't received a pass yet
+// (they picked up after a pull / turnover, or are the intercepter). On
+// each new possession run for the team this resets, so the "first pass"
+// rule applies *every* time they get the disc fresh.
+function isFirstPossession(visLog: VisLogEntry[], teamId: TeamId): boolean {
+  let count = 0
+  for (let i = visLog.length - 1; i >= 0; i--) {
+    const e = visLog[i]
+    if (e.type === 'possession' && e.teamId === teamId) {
+      count++
+      if (count >= 2) return false
+    } else {
+      break
+    }
+  }
+  return true
+}
+
+const FIRST_POSSESSION_DISABLED: ReadonlySet<ChipId> = new Set<ChipId>(['goal', 'rec'])
+const NO_DISABLED: ReadonlySet<ChipId> = new Set<ChipId>()
 
 // Derive pass arrows for the active team's *current* possession run.
 //
@@ -99,6 +121,16 @@ export default function LiveEntry() {
     () => (activeTeam ? derivePassArrows(visLog, activeTeam, activePlayers) : []),
     [visLog, activeTeam, activePlayers],
   )
+
+  // Goal and Receiver Error are disabled until the team has recorded at
+  // least one pass within the current possession run. Only meaningful in
+  // the in-play phase (pull-phase chips and pick-mode have their own gates).
+  const disabledChipIds = useMemo<ReadonlySet<ChipId>>(() => {
+    if (!activeTeam || pickMode || phase !== 'in-play') return NO_DISABLED
+    return isFirstPossession(visLog, activeTeam)
+      ? FIRST_POSSESSION_DISABLED
+      : NO_DISABLED
+  }, [visLog, activeTeam, pickMode, phase])
 
   // Auto-navigate to LineSelection after a goal or half-time. game-over stays
   // on the canvas with an inline banner (no end-game screen yet).
@@ -208,6 +240,7 @@ export default function LiveEntry() {
               stallShown={recordingOptions.stall}
               bonusShown={recordingOptions.pullBonus}
               pillSize={pillSize}
+              disabledChipIds={disabledChipIds}
               arrows={arrows}
               centre={{ x: cx, y: cy }}
               bounds={{ w: stageW, h: stageH }}
