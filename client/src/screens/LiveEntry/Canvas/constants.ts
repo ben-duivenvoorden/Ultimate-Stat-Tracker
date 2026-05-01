@@ -7,7 +7,10 @@ export const CHIP_H = 22
 // Physics. Tuned for an overdamped settle — pills approach equilibrium
 // without any oscillation / bounce-back. The reference values were
 // 2.6 / 150 / 1400 / 0.82.
-export const CENTER_K = 0.9
+// Spring is intentionally weak so the initial spread (set by
+// initialPositions in physics.ts) is mostly preserved at rest — pills
+// don't all clump to the centre.
+export const CENTER_K = 0.3
 // Soft repulsion only kicks in when pill-to-pill clearance is below
 // REPULSE_R px. Smaller = pills allowed to sit closer before pushing apart.
 export const REPULSE_R = 30

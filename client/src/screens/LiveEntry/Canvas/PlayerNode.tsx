@@ -90,8 +90,7 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
     isPuller             ? `${teamColor}18` :
                            `${teamColor}08`
   const borderColor = ineligible ? 'var(--color-border)' : teamColor
-  const borderWidth = isHolder ? 2.5 : 1.5
-  const borderStyle = isPuller && !isHolder ? 'dashed' : 'solid'
+  const borderWidth = isHolder ? 2.5 : isPuller ? 2 : 1.5
 
   return (
     <div
@@ -128,7 +127,7 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
           padding: '0 16px',
           boxSizing: 'border-box',
           borderRadius: 9999,
-          border: `${borderWidth}px ${borderStyle} ${borderColor}`,
+          border: `${borderWidth}px solid ${borderColor}`,
           background: bg,
           color: ineligible ? 'var(--color-dim)' : 'var(--color-content)',
           // `width: max-content` + flex makes the pill grow/shrink to its
@@ -151,9 +150,11 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
             ? `0 0 0 2px ${teamColor}4d, 0 8px 22px rgba(0,0,0,0.55), 0 0 22px ${teamColor}55`
             : isOpen
               ? `0 0 0 2px ${teamColor}33, 0 0 18px ${teamColor}55`
-              : isHolder
-                ? `0 0 12px ${teamColor}33`
-                : '0 0 0 0 transparent',
+              : isPuller && !isHolder
+                ? `0 0 0 3px ${teamColor}3d, 0 0 28px ${teamColor}99`
+                : isHolder
+                  ? `0 0 12px ${teamColor}33`
+                  : '0 0 0 0 transparent',
           transition: 'box-shadow 160ms ease, background 160ms ease, transform 140ms ease, border-color 160ms ease',
         }}
       >

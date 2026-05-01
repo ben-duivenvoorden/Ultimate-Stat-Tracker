@@ -134,9 +134,11 @@ export function openZoneRects(cx: number, cy: number, HW: number, chips: ChipSpe
 }
 
 // Place n pills around a fixed-radius ring centered on the canvas.
+// Radius factor controls the default spread — bigger = pills start (and,
+// with the weak spring, stay) further apart.
 export function initialPositions(n: number, w: number, h: number): Vec[] {
   const cx = w / 2, cy = h / 2
-  const r = Math.min(w, h) * 0.28
+  const r = Math.min(w, h) * 0.36
   return Array.from({ length: n }, (_, i) => {
     const a = (i / n) * Math.PI * 2 - Math.PI / 2
     return {
