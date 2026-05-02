@@ -8,6 +8,7 @@ import type {
   Player,
   GameSession,
   RecordingOptions,
+  DerivedGameState,
 } from './types'
 import type { PillSize } from '@/screens/LiveEntry/Canvas/constants'
 import { PILL_SIZE_CYCLE } from '@/screens/LiveEntry/Canvas/constants'
@@ -108,6 +109,27 @@ export function seedDefaultLine(roster: Player[]): Player[] {
 function sameLine(a: PlayerId[], b: PlayerId[]): boolean {
   if (a.length !== b.length) return false
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+  return true
+}
+
+// ─── recordVia ────────────────────────────────────────────────────────────────
+// Common funnel for actions that append events. Reads the derived state, lets
+// the caller's `build` decide whether to record (returning null aborts), then
+// commits the events plus any extra state in a single set(). Side-effect
+// fields like `selPuller` / `showEventMenu` go through `extra` so they only
+// fire on success — matching the pre-refactor per-action behaviour.
+function recordVia(
+  get: () => GameStore,
+  set: (partial: Partial<GameStore>) => void,
+  build: (state: DerivedGameState) => RawEventInput[] | null,
+  extra?: Partial<GameStore>,
+): boolean {
+  const { session } = get()
+  if (!session) return false
+  const state = deriveGameState(session)
+  const events = build(state)
+  if (!events || events.length === 0) return false
+  set({ session: appendEvents(session, events), ...extra })
   return true
 }
 
@@ -231,17 +253,17 @@ export const useGameStore = create<GameStore>()(
         }
 
         // Pass chain: tap = possession transfer
-        if (state.gamePhase === 'in-play' && canRecord(state, 'possession')) {
-          // Don't record if they already have possession
-          if (state.discHolder === player.id) return
-
-          set({
-            session: appendEvents(session, [{
-              pointIndex: state.pointIndex,
+        if (state.gamePhase === 'in-play') {
+          recordVia(get, set, s => {
+            if (!canRecord(s, 'possession')) return null
+            // Don't record if they already have possession
+            if (s.discHolder === player.id) return null
+            return [{
+              pointIndex: s.pointIndex,
               type:     'possession',
               playerId: player.id,
-              teamId:   state.possession,
-            }]),
+              teamId:   s.possession,
+            }]
           })
           return
         }
@@ -249,21 +271,18 @@ export const useGameStore = create<GameStore>()(
 
       // ── recordPull ──────────────────────────────────────────────────────────
       recordPull(bonus = false) {
-        const { session, selPuller } = get()
-        if (!session || !selPuller) return
-        const state = deriveGameState(session)
-        if (!canRecord(state, 'pull')) return
-
-        const pullingTeam = otherTeam(state.possession)
-        set({
-          session: appendEvents(session, [{
+        const { selPuller } = get()
+        if (!selPuller) return
+        recordVia(get, set, state => {
+          if (!canRecord(state, 'pull')) return null
+          const pullingTeam = otherTeam(state.possession)
+          return [{
             pointIndex: state.pointIndex,
             type:     bonus ? 'pull-bonus' : 'pull',
             playerId: selPuller,
             teamId:   pullingTeam,
-          }]),
-          selPuller: null,
-        })
+          }]
+        }, { selPuller: null })
       },
 
       // ── recordBrick ─────────────────────────────────────────────────────────
@@ -271,37 +290,30 @@ export const useGameStore = create<GameStore>()(
       // mark — engine-wise this transitions to in-play just like pull, the
       // difference is purely the recorded event type (for stats / reporting).
       recordBrick() {
-        const { session, selPuller } = get()
-        if (!session || !selPuller) return
-        const state = deriveGameState(session)
-        if (!canRecord(state, 'brick')) return
-
-        const pullingTeam = otherTeam(state.possession)
-        set({
-          session: appendEvents(session, [{
+        const { selPuller } = get()
+        if (!selPuller) return
+        recordVia(get, set, state => {
+          if (!canRecord(state, 'brick')) return null
+          const pullingTeam = otherTeam(state.possession)
+          return [{
             pointIndex: state.pointIndex,
             type:     'brick',
             playerId: selPuller,
             teamId:   pullingTeam,
-          }]),
-          selPuller: null,
-        })
+          }]
+        }, { selPuller: null })
       },
 
       // ── recordThrowAway ─────────────────────────────────────────────────────
       recordThrowAway() {
-        const { session } = get()
-        if (!session) return
-        const state = deriveGameState(session)
-        if (!canRecord(state, 'turnover-throw-away') || !state.discHolder) return
-
-        set({
-          session: appendEvents(session, [{
+        recordVia(get, set, state => {
+          if (!canRecord(state, 'turnover-throw-away') || !state.discHolder) return null
+          return [{
             pointIndex: state.pointIndex,
             type:     'turnover-throw-away',
             playerId: state.discHolder,
             teamId:   state.possession,
-          }]),
+          }]
         })
       },
 
@@ -321,29 +333,27 @@ export const useGameStore = create<GameStore>()(
       recordGoal() {
         const { session } = get()
         if (!session) return
-        const state = deriveGameState(session)
-        if (!canRecord(state, 'goal') || !state.discHolder) return
-
-        const events: RawEventInput[] = [{
-          pointIndex: state.pointIndex,
-          type:     'goal',
-          playerId: state.discHolder,
-          teamId:   state.possession,
-        }]
-
-        // Auto-append half-time / end-game when thresholds met
-        const newScore = { ...state.score, [state.possession]: state.score[state.possession] + 1 }
-        const total = newScore.A + newScore.B
-        const cap = session.gameConfig.scoreCapAt
+        const cap  = session.gameConfig.scoreCapAt
         const half = session.gameConfig.halfTimeAt
 
-        if (newScore.A >= cap || newScore.B >= cap) {
-          events.push({ pointIndex: state.pointIndex, type: 'end-game' })
-        } else if (total === half) {
-          events.push({ pointIndex: state.pointIndex, type: 'half-time' })
-        }
-
-        set({ session: appendEvents(session, events) })
+        recordVia(get, set, state => {
+          if (!canRecord(state, 'goal') || !state.discHolder) return null
+          const events: RawEventInput[] = [{
+            pointIndex: state.pointIndex,
+            type:     'goal',
+            playerId: state.discHolder,
+            teamId:   state.possession,
+          }]
+          // Auto-append half-time / end-game when thresholds met
+          const newScore = { ...state.score, [state.possession]: state.score[state.possession] + 1 }
+          const total = newScore.A + newScore.B
+          if (newScore.A >= cap || newScore.B >= cap) {
+            events.push({ pointIndex: state.pointIndex, type: 'end-game' })
+          } else if (total === half) {
+            events.push({ pointIndex: state.pointIndex, type: 'half-time' })
+          }
+          return events
+        })
       },
 
       // ── triggerDefBlock ─────────────────────────────────────────────────────
@@ -356,37 +366,32 @@ export const useGameStore = create<GameStore>()(
 
       // ── undo ────────────────────────────────────────────────────────────────
       undo() {
-        const { session } = get()
-        if (!session) return
-        const state = deriveGameState(session)
-        set({
-          session: appendEvents(session, [{ pointIndex: state.pointIndex, type: 'undo' }]),
-          uiMode: 'idle',
-          selPuller: null,
-        })
+        recordVia(
+          get, set,
+          state => [{ pointIndex: state.pointIndex, type: 'undo' }],
+          { uiMode: 'idle', selPuller: null },
+        )
       },
 
       // ── triggerHalfTime / triggerEndGame ────────────────────────────────────
       triggerHalfTime() {
-        const { session } = get()
-        if (!session) return
-        const state = deriveGameState(session)
-        if (!canRecord(state, 'half-time')) return
-        set({
-          session: appendEvents(session, [{ pointIndex: state.pointIndex, type: 'half-time' }]),
-          showEventMenu: false,
-        })
+        recordVia(
+          get, set,
+          state => canRecord(state, 'half-time')
+            ? [{ pointIndex: state.pointIndex, type: 'half-time' }]
+            : null,
+          { showEventMenu: false },
+        )
       },
 
       triggerEndGame() {
-        const { session } = get()
-        if (!session) return
-        const state = deriveGameState(session)
-        if (!canRecord(state, 'end-game')) return
-        set({
-          session: appendEvents(session, [{ pointIndex: state.pointIndex, type: 'end-game' }]),
-          showEventMenu: false,
-        })
+        recordVia(
+          get, set,
+          state => canRecord(state, 'end-game')
+            ? [{ pointIndex: state.pointIndex, type: 'end-game' }]
+            : null,
+          { showEventMenu: false },
+        )
       },
 
       // ── triggerInjurySub ────────────────────────────────────────────────────
@@ -422,17 +427,13 @@ export const useGameStore = create<GameStore>()(
       // Reorders the on-field display order for a team. Recorded as a
       // 'reorder-line' event so other peers see the same order on sync.
       reorderActiveLine(teamId, fromIdx, toIdx) {
-        const { session } = get()
-        if (!session || fromIdx === toIdx) return
-        const state = deriveGameState(session)
-        const current = state.activeLine[teamId].map(p => p.id)
-        if (fromIdx < 0 || fromIdx >= current.length || toIdx < 0 || toIdx >= current.length) return
-        const [moved] = current.splice(fromIdx, 1)
-        current.splice(toIdx, 0, moved)
-        set({
-          session: appendEvents(session, [
-            { pointIndex: state.pointIndex, type: 'reorder-line', teamId, line: current },
-          ]),
+        if (fromIdx === toIdx) return
+        recordVia(get, set, state => {
+          const current = state.activeLine[teamId].map(p => p.id)
+          if (fromIdx < 0 || fromIdx >= current.length || toIdx < 0 || toIdx >= current.length) return null
+          const [moved] = current.splice(fromIdx, 1)
+          current.splice(toIdx, 0, moved)
+          return [{ pointIndex: state.pointIndex, type: 'reorder-line', teamId, line: current }]
         })
       },
 
@@ -450,51 +451,45 @@ export const useGameStore = create<GameStore>()(
 
       // ── recordFoul / recordPick ──────────────────────────────────────────────
       recordFoul() {
-        const { session } = get()
-        if (!session) return
-        const state = deriveGameState(session)
-        if (!canRecord(state, 'foul')) return
-        set({
-          session: appendEvents(session, [{ pointIndex: state.pointIndex, type: 'foul' }]),
-          showEventMenu: false,
-        })
+        recordVia(
+          get, set,
+          state => canRecord(state, 'foul')
+            ? [{ pointIndex: state.pointIndex, type: 'foul' }]
+            : null,
+          { showEventMenu: false },
+        )
       },
 
       recordPick() {
-        const { session } = get()
-        if (!session) return
-        const state = deriveGameState(session)
-        if (!canRecord(state, 'pick')) return
-        set({
-          session: appendEvents(session, [{ pointIndex: state.pointIndex, type: 'pick' }]),
-          showEventMenu: false,
-        })
+        recordVia(
+          get, set,
+          state => canRecord(state, 'pick')
+            ? [{ pointIndex: state.pointIndex, type: 'pick' }]
+            : null,
+          { showEventMenu: false },
+        )
       },
 
       recordStall() {
-        const { session } = get()
-        if (!session) return
-        const state = deriveGameState(session)
-        if (!canRecord(state, 'turnover-stall') || !state.discHolder) return
-        set({
-          session: appendEvents(session, [{
+        recordVia(get, set, state => {
+          if (!canRecord(state, 'turnover-stall') || !state.discHolder) return null
+          return [{
             pointIndex: state.pointIndex,
             type:     'turnover-stall',
             playerId: state.discHolder,
             teamId:   state.possession,
-          }]),
+          }]
         })
       },
 
       recordTimeout() {
-        const { session } = get()
-        if (!session) return
-        const state = deriveGameState(session)
-        if (!canRecord(state, 'timeout')) return
-        set({
-          session: appendEvents(session, [{ pointIndex: state.pointIndex, type: 'timeout' }]),
-          showEventMenu: false,
-        })
+        recordVia(
+          get, set,
+          state => canRecord(state, 'timeout')
+            ? [{ pointIndex: state.pointIndex, type: 'timeout' }]
+            : null,
+          { showEventMenu: false },
+        )
       },
 
       // ── Settings navigation ──────────────────────────────────────────────────

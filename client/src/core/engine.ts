@@ -6,6 +6,7 @@ import type {
   DerivedGameState,
   PlayerId,
   Player,
+  AmendRawEvent,
 } from './types'
 import { otherTeam } from './types'
 
@@ -24,51 +25,60 @@ function nextEventId(session: GameSession): number {
   return session.rawLog[session.rawLog.length - 1].id + 1
 }
 
+// ─── Raw-log resolution ───────────────────────────────────────────────────────
+// One walker, two consumers: the visible event log and game-state derivation.
+// Both need to fold undo / amend into the upstream log; they only differ on
+// whether `reorder-line` (a display directive) sticks around in the result.
+
+type Resolved = Exclude<RawEvent, UndoOrAmend>
+
+interface ResolveOpts {
+  /** Derivation needs reorder-line to walk activeLine through display tweaks;
+   *  the visible log filters it out. */
+  keepReorderLine: boolean
+}
+
+function resolveRawLog(rawLog: RawEvent[], opts: ResolveOpts): Resolved[] {
+  const out: Resolved[] = []
+  for (const event of rawLog) {
+    if (event.type === 'undo')  { popLastVisible(out); continue }
+    if (event.type === 'amend') { applyAmend(out, event); continue }
+    if (event.type === 'reorder-line' && !opts.keepReorderLine) continue
+    out.push(event)
+  }
+  return out
+}
+
+// Undoing structural events would corrupt phase tracking, so they're skipped:
+// point-start / half-time / end-game / system anchor the timeline; reorder-line
+// is a display directive that lives outside the visible-event sequence.
+function popLastVisible(entries: Resolved[]): void {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const t = entries[i].type
+    if (t !== 'system' && t !== 'point-start' && t !== 'half-time' && t !== 'end-game' && t !== 'reorder-line') {
+      entries.splice(i, 1)
+      return
+    }
+  }
+}
+
+function applyAmend(entries: Resolved[], event: AmendRawEvent): void {
+  const idx = entries.findIndex(e => e.id === event.targetEventId)
+  if (idx === -1) return
+  if (event.replacement === null) {
+    entries.splice(idx, 1)
+    return
+  }
+  const r = event.replacement
+  if (r.type !== 'undo' && r.type !== 'amend' && r.type !== 'reorder-line') {
+    entries[idx] = r
+  }
+}
+
 // ─── Visual log derivation ────────────────────────────────────────────────────
-// Resolves the raw log into the list of entries that the recorder sees.
-// Undo entries pop the most recent visible entry. Amend entries replace by ID.
 
 export function computeVisLog(rawLog: RawEvent[]): VisLogEntry[] {
-  const entries: VisLogEntry[] = []
-
-  for (const event of rawLog) {
-    if (event.type === 'undo') {
-      // Pop the most recent visible non-system entry.
-      // Note: 'point-start' and 'system' / 'half-time' / 'end-game' are kept around
-      // because they're structural — undoing a point-start would corrupt phase tracking.
-      for (let i = entries.length - 1; i >= 0; i--) {
-        const e = entries[i]
-        if (e.type !== 'system' && e.type !== 'point-start' && e.type !== 'half-time' && e.type !== 'end-game') {
-          entries.splice(i, 1)
-          break
-        }
-      }
-      continue
-    }
-
-    if (event.type === 'amend') {
-      const idx = entries.findIndex(e => e.id === event.targetEventId)
-      if (idx === -1) continue
-      if (event.replacement === null) {
-        entries.splice(idx, 1)
-      } else if (
-        event.replacement.type !== 'undo'
-        && event.replacement.type !== 'amend'
-        && event.replacement.type !== 'reorder-line'
-      ) {
-        entries[idx] = event.replacement
-      }
-      continue
-    }
-
-    // reorder-line is structural display state — kept in rawLog for sync but
-    // doesn't surface in the visible event log.
-    if (event.type === 'reorder-line') continue
-
-    entries.push(event as VisLogEntry)
-  }
-
-  return entries
+  return resolveRawLog(rawLog, { keepReorderLine: false }) as VisLogEntry[]
 }
 
 // ─── Derived game state ───────────────────────────────────────────────────────
@@ -203,33 +213,8 @@ export function deriveGameState(session: GameSession): DerivedGameState {
 
 /** Like computeVisLog but keeps reorder-line events (state derivation needs
  *  them; the visible log doesn't). Resolves undo/amend the same way. */
-function resolveLogForDerivation(rawLog: RawEvent[]): Exclude<RawEvent, UndoOrAmend>[] {
-  type Resolved = Exclude<RawEvent, UndoOrAmend>
-  const entries: Resolved[] = []
-  for (const event of rawLog) {
-    if (event.type === 'undo') {
-      for (let i = entries.length - 1; i >= 0; i--) {
-        const e = entries[i]
-        if (e.type !== 'system' && e.type !== 'point-start' && e.type !== 'half-time' && e.type !== 'end-game' && e.type !== 'reorder-line') {
-          entries.splice(i, 1)
-          break
-        }
-      }
-      continue
-    }
-    if (event.type === 'amend') {
-      const idx = entries.findIndex(e => e.id === event.targetEventId)
-      if (idx === -1) continue
-      if (event.replacement === null) {
-        entries.splice(idx, 1)
-      } else if (event.replacement.type !== 'undo' && event.replacement.type !== 'amend') {
-        entries[idx] = event.replacement
-      }
-      continue
-    }
-    entries.push(event)
-  }
-  return entries
+function resolveLogForDerivation(rawLog: RawEvent[]): Resolved[] {
+  return resolveRawLog(rawLog, { keepReorderLine: true })
 }
 
 type UndoOrAmend = Extract<RawEvent, { type: 'undo' | 'amend' }>

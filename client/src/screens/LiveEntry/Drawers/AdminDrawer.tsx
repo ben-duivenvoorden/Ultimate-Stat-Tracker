@@ -2,7 +2,7 @@ import type { DerivedGameState, RecordingOptions } from '@/core/types'
 import { canRecord } from '@/core/engine'
 import { Label } from '@/components/ui/Label'
 import { Btn } from '@/components/ui/Btn'
-import { Drawer, DRAWER_RAIL_W } from './Drawer'
+import { Drawer } from './Drawer'
 import type { PillSize } from '../Canvas/constants'
 
 interface AdminDrawerProps {
@@ -28,57 +28,48 @@ export function AdminDrawer({
   pillSize, onCyclePillSize,
 }: AdminDrawerProps) {
   const can = (t: Parameters<typeof canRecord>[1]) => canRecord(state, t)
-  const drawerW = expanded ? ADMIN_DRAWER_W : DRAWER_RAIL_W
 
   return (
-    // Vertical stack: the Drawer fills available height, then the size-cycle
-    // button sits beneath it. The size button is visible whether the drawer
-    // is collapsed or expanded; its width matches the drawer's current width.
-    <div className="flex-shrink-0 flex flex-col" style={{ width: drawerW, transition: 'width 220ms ease-in-out' }}>
-      <div className="flex-1 flex" style={{ minHeight: 0 }}>
-        <Drawer
-          side="left"
-          expanded={expanded}
-          width={ADMIN_DRAWER_W}
-          onToggle={onToggle}
-          rail={<AdminRailIcon />}
-        >
-          <div
-            className="flex-shrink-0 h-7 flex items-center justify-center px-2.5"
-            style={{ borderBottom: '1px solid var(--color-border)' }}
-          >
-            <Label>STOPPAGES</Label>
-          </div>
-
-          <div className="flex-1 p-1.5 flex flex-col gap-1.5 overflow-y-auto">
-            <Btn variant="warn"  size="sm" full disabled={!can('injury-sub')} onClick={onInjurySub}>Injury Sub</Btn>
-            <Btn variant="ghost" size="sm" full disabled={!can('timeout')}    onClick={onTimeout}>Timeout</Btn>
-            {recordingOptions.foul && (
-              <Btn variant="ghost" size="sm" full disabled={!can('foul')} onClick={onFoul}>Foul</Btn>
-            )}
-            {recordingOptions.pick && (
-              <Btn variant="ghost" size="sm" full disabled={!can('pick')} onClick={onPick}>Pick</Btn>
-            )}
-
-            <div className="h-px my-1" style={{ background: 'var(--color-border)' }} />
-
-            {/*
-              TODO(canvas): the post-goal flow now auto-navigates to LineSelection
-              (see plan decision 12), so manual Half-Time / End-Game become
-              unreachable from the canvas (they require gamePhase === 'in-play' or
-              'awaiting-pull'). The engine still auto-emits Half-Time at the score
-              threshold, so this is rarely a problem in practice — but the manual
-              buttons are kept here, perma-disabled, until a follow-up redesign
-              decides where they should live.
-            */}
-            <Btn variant="ghost" size="sm" full disabled onClick={onHalfTime}>Half Time</Btn>
-            <Btn variant="ghost" size="sm" full disabled onClick={onEndGame}>End Game</Btn>
-          </div>
-        </Drawer>
+    <Drawer
+      side="left"
+      expanded={expanded}
+      width={ADMIN_DRAWER_W}
+      onToggle={onToggle}
+      rail={<AdminRailIcon />}
+      footer={<PillSizeButton size={pillSize} expanded={expanded} onClick={onCyclePillSize} />}
+    >
+      <div
+        className="flex-shrink-0 h-7 flex items-center justify-center px-2.5"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
+        <Label>STOPPAGES</Label>
       </div>
 
-      <PillSizeButton size={pillSize} expanded={expanded} onClick={onCyclePillSize} />
-    </div>
+      <div className="flex-1 p-1.5 flex flex-col gap-1.5 overflow-y-auto">
+        <Btn variant="warn"  size="sm" full disabled={!can('injury-sub')} onClick={onInjurySub}>Injury Sub</Btn>
+        <Btn variant="ghost" size="sm" full disabled={!can('timeout')}    onClick={onTimeout}>Timeout</Btn>
+        {recordingOptions.foul && (
+          <Btn variant="ghost" size="sm" full disabled={!can('foul')} onClick={onFoul}>Foul</Btn>
+        )}
+        {recordingOptions.pick && (
+          <Btn variant="ghost" size="sm" full disabled={!can('pick')} onClick={onPick}>Pick</Btn>
+        )}
+
+        <div className="h-px my-1" style={{ background: 'var(--color-border)' }} />
+
+        {/*
+          TODO(canvas): the post-goal flow now auto-navigates to LineSelection
+          (see plan decision 12), so manual Half-Time / End-Game become
+          unreachable from the canvas (they require gamePhase === 'in-play' or
+          'awaiting-pull'). The engine still auto-emits Half-Time at the score
+          threshold, so this is rarely a problem in practice — but the manual
+          buttons are kept here, perma-disabled, until a follow-up redesign
+          decides where they should live.
+        */}
+        <Btn variant="ghost" size="sm" full disabled onClick={onHalfTime}>Half Time</Btn>
+        <Btn variant="ghost" size="sm" full disabled onClick={onEndGame}>End Game</Btn>
+      </div>
+    </Drawer>
   )
 }
 

@@ -64,6 +64,45 @@ function chipIdToVisType(id: ChipId): VisLogEntry['type'] | null {
   }
 }
 
+interface PillVisualState {
+  teamColor:  string
+  isHolder:   boolean
+  isPuller:   boolean
+  isOpen:     boolean
+  dragging:   boolean
+  ineligible: boolean
+}
+
+interface PillVisuals {
+  bg:          string
+  borderColor: string
+  borderWidth: number
+  boxShadow:   string
+}
+
+// Maps pill state → the four visual properties that vary across states.
+// Pulled out of the JSX so the layered ternaries don't need to be re-read in
+// situ when one of them is tweaked.
+function pillVisuals({ teamColor, isHolder, isPuller, isOpen, dragging, ineligible }: PillVisualState): PillVisuals {
+  const bg =
+    ineligible           ? 'var(--color-surf-2)' :
+    isOpen || isHolder   ? `${teamColor}28` :
+    isPuller             ? `${teamColor}18` :
+                           `${teamColor}08`
+
+  const borderColor = ineligible ? 'var(--color-border)' : teamColor
+  const borderWidth = isHolder ? 2.5 : isPuller ? 2 : 1.5
+
+  const boxShadow =
+    dragging                  ? `0 0 0 2px ${teamColor}4d, 0 8px 22px rgba(0,0,0,0.55), 0 0 22px ${teamColor}55` :
+    isOpen                    ? `0 0 0 2px ${teamColor}33, 0 0 18px ${teamColor}55` :
+    isPuller && !isHolder     ? `0 0 0 3px ${teamColor}3d, 0 0 28px ${teamColor}99` :
+    isHolder                  ? `0 0 12px ${teamColor}33` :
+                                '0 0 0 0 transparent'
+
+  return { bg, borderColor, borderWidth, boxShadow }
+}
+
 export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function PlayerNode(
   { name, teamColor, scale, isHolder, isPuller, isOpen, dragging, ineligible, chips,
     disabledChipIds, onMouseDown, onTouchStart, onClick, onChipClick, onMeasureWidth }, ref,
@@ -89,14 +128,9 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
     return () => ro.disconnect()
   }, [name, onMeasureWidth])
 
-  // Background / border by state. Holder = thicker border + fuller fill.
-  const bg =
-    ineligible           ? 'var(--color-surf-2)' :
-    isOpen || isHolder   ? `${teamColor}28` :
-    isPuller             ? `${teamColor}18` :
-                           `${teamColor}08`
-  const borderColor = ineligible ? 'var(--color-border)' : teamColor
-  const borderWidth = isHolder ? 2.5 : isPuller ? 2 : 1.5
+  const { bg, borderColor, borderWidth, boxShadow } = pillVisuals({
+    teamColor, isHolder, isPuller, isOpen, dragging, ineligible,
+  })
 
   return (
     <div
@@ -187,15 +221,7 @@ export const PlayerNode = forwardRef<HTMLDivElement, PlayerNodeProps>(function P
           userSelect: 'none', WebkitUserSelect: 'none',
           cursor: ineligible ? 'default' : (dragging ? 'grabbing' : 'grab'),
           touchAction: 'none',
-          boxShadow: dragging
-            ? `0 0 0 2px ${teamColor}4d, 0 8px 22px rgba(0,0,0,0.55), 0 0 22px ${teamColor}55`
-            : isOpen
-              ? `0 0 0 2px ${teamColor}33, 0 0 18px ${teamColor}55`
-              : isPuller && !isHolder
-                ? `0 0 0 3px ${teamColor}3d, 0 0 28px ${teamColor}99`
-                : isHolder
-                  ? `0 0 12px ${teamColor}33`
-                  : '0 0 0 0 transparent',
+          boxShadow,
           transition: 'box-shadow 160ms ease, background 160ms ease, transform 140ms ease, border-color 160ms ease',
         }}
       >
