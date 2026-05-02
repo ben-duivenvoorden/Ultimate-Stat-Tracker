@@ -3,4 +3,3 @@
 
 # Claude Code — local settings are machine-specific; settings.json (shared config) is committed if present
 .claude/settings.local.json
-/docs/_get_changes/
