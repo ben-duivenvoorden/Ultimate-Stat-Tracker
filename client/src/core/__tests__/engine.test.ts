@@ -271,4 +271,101 @@ describe('canRecord', () => {
     expect(canRecord(state, 'goal')).toBe(false)
     expect(canRecord(state, 'half-time')).toBe(false)
   })
+
+  it('truncate is always recordable', () => {
+    let session = makeSession('A')
+    expect(canRecord(deriveGameState(session), 'truncate')).toBe(true)
+    session = appendEvents(session, [
+      startPoint(0),
+      { pointIndex: 0, type: 'goal', playerId: 14, teamId: 'B' },
+      { pointIndex: 1, type: 'end-game' },
+    ])
+    expect(canRecord(deriveGameState(session), 'truncate')).toBe(true)
+  })
+})
+
+// ─── truncate ─────────────────────────────────────────────────────────────────
+
+describe('truncate', () => {
+  it('drops every entry whose id > truncateAfterId in computeVisLog', () => {
+    let session = makeSession('A')
+    session = appendEvents(session, [
+      startPoint(0),                                                   // id 1
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },       // id 2
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' },// id 3
+      { pointIndex: 0, type: 'possession', playerId: 15, teamId: 'B' },// id 4
+    ])
+    session = appendEvents(session, [{ pointIndex: 0, type: 'truncate', truncateAfterId: 2 }])
+    const vis = computeVisLog(session.rawLog)
+    expect(vis.map(e => e.id)).toEqual([1, 2])
+  })
+
+  it('events appended after the truncate remain visible', () => {
+    let session = makeSession('A')
+    session = appendEvents(session, [
+      startPoint(0),                                                   // id 1
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },       // id 2
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' },// id 3
+    ])
+    session = appendEvents(session, [
+      { pointIndex: 0, type: 'truncate', truncateAfterId: 2 },         // id 4
+      { pointIndex: 0, type: 'possession', playerId: 15, teamId: 'B' },// id 5
+    ])
+    const vis = computeVisLog(session.rawLog)
+    expect(vis.map(e => e.id)).toEqual([1, 2, 5])
+  })
+
+  it('truncate itself never appears in the visible log', () => {
+    let session = makeSession('A')
+    session = appendEvents(session, [
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
+      { pointIndex: 0, type: 'truncate', truncateAfterId: 2 },
+    ])
+    const vis = computeVisLog(session.rawLog)
+    expect(vis.some(e => (e as { type: string }).type === 'truncate')).toBe(false)
+  })
+
+  it('deriveGameState over [E1, E2, E3, truncate(2), E5] equals direct derivation of [E1, E2, E5]', () => {
+    // Build a session up to a goal, truncate back to the pull, then record a
+    // different subsequent possession + goal — the resulting state should
+    // match what we'd get by recording just the kept events from the start.
+    let withTruncate = makeSession('A')
+    withTruncate = appendEvents(withTruncate, [
+      startPoint(0),                                                    // 1
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },        // 2
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' }, // 3 ← gets dropped
+      { pointIndex: 0, type: 'goal',       playerId: 14, teamId: 'B' }, // 4 ← gets dropped
+    ])
+    withTruncate = appendEvents(withTruncate, [
+      { pointIndex: 0, type: 'truncate', truncateAfterId: 2 },          // 5
+      { pointIndex: 0, type: 'possession', playerId: 15, teamId: 'B' }, // 6
+    ])
+
+    let direct = makeSession('A')
+    direct = appendEvents(direct, [
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
+      { pointIndex: 0, type: 'possession', playerId: 15, teamId: 'B' },
+    ])
+
+    const a = deriveGameState(withTruncate)
+    const b = deriveGameState(direct)
+    expect(a.gamePhase).toBe(b.gamePhase)
+    expect(a.score).toEqual(b.score)
+    expect(a.possession).toBe(b.possession)
+    expect(a.discHolder).toBe(b.discHolder)
+    expect(a.pointIndex).toBe(b.pointIndex)
+  })
+
+  it('truncate is a no-op when no entries are past the cursor', () => {
+    let session = makeSession('A')
+    session = appendEvents(session, [
+      startPoint(0),
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },
+      { pointIndex: 0, type: 'truncate', truncateAfterId: 999 },
+    ])
+    const vis = computeVisLog(session.rawLog)
+    expect(vis.map(e => e.type)).toEqual(['point-start', 'pull'])
+  })
 })

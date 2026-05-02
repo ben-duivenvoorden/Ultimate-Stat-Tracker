@@ -58,6 +58,8 @@ export type RawEventType =
   | 'system'
   | 'undo'
   | 'amend'
+  | 'truncate'                 // drops every event with id > truncateAfterId
+                               // — used by tap-to-truncate to commit a rewind
 
 interface BaseRawEvent {
   id: EventId
@@ -85,6 +87,10 @@ export interface PickRawEvent       extends BaseRawEvent { type: 'pick' }
 export interface SystemRawEvent     extends BaseRawEvent { type: 'system'; text: string }
 export interface UndoRawEvent       extends BaseRawEvent { type: 'undo' }
 export interface AmendRawEvent      extends BaseRawEvent { type: 'amend'; targetEventId: EventId; replacement: RawEvent | null }
+// Structural — never appears in the visible log. The engine drops every
+// resolved entry whose id > truncateAfterId, then carries on with whatever
+// events follow in the rawLog.
+export interface TruncateRawEvent   extends BaseRawEvent { type: 'truncate'; truncateAfterId: EventId }
 
 export type RawEvent =
   | PointStartRawEvent
@@ -103,13 +109,14 @@ export type RawEvent =
   | SystemRawEvent
   | UndoRawEvent
   | AmendRawEvent
+  | TruncateRawEvent
 
 // ─── Visual log ───────────────────────────────────────────────────────────────
-// Same shape as RawEvent minus structural-only entries (undo/amend resolve into
-// the visible list; reorder-line is purely a display directive).
+// Same shape as RawEvent minus structural-only entries (undo/amend/truncate
+// resolve into the visible list; reorder-line is purely a display directive).
 // Structured — no formatted strings. UI layer formats via format.ts.
 
-export type VisLogEntry = Exclude<RawEvent, UndoRawEvent | AmendRawEvent | LineReorderRawEvent>
+export type VisLogEntry = Exclude<RawEvent, UndoRawEvent | AmendRawEvent | LineReorderRawEvent | TruncateRawEvent>
 
 // ─── Derived game state ───────────────────────────────────────────────────────
 

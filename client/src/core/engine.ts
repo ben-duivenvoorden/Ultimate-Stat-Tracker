@@ -30,7 +30,7 @@ function nextEventId(session: GameSession): number {
 // Both need to fold undo / amend into the upstream log; they only differ on
 // whether `reorder-line` (a display directive) sticks around in the result.
 
-type Resolved = Exclude<RawEvent, UndoOrAmend>
+type Resolved = Exclude<RawEvent, StructuralOnly>
 
 interface ResolveOpts {
   /** Derivation needs reorder-line to walk activeLine through display tweaks;
@@ -41,8 +41,9 @@ interface ResolveOpts {
 function resolveRawLog(rawLog: RawEvent[], opts: ResolveOpts): Resolved[] {
   const out: Resolved[] = []
   for (const event of rawLog) {
-    if (event.type === 'undo')  { popLastVisible(out); continue }
-    if (event.type === 'amend') { applyAmend(out, event); continue }
+    if (event.type === 'undo')     { popLastVisible(out); continue }
+    if (event.type === 'amend')    { applyAmend(out, event); continue }
+    if (event.type === 'truncate') { dropAfter(out, event.truncateAfterId); continue }
     if (event.type === 'reorder-line' && !opts.keepReorderLine) continue
     out.push(event)
   }
@@ -70,8 +71,17 @@ function applyAmend(entries: Resolved[], event: AmendRawEvent): void {
     return
   }
   const r = event.replacement
-  if (r.type !== 'undo' && r.type !== 'amend' && r.type !== 'reorder-line') {
+  if (r.type !== 'undo' && r.type !== 'amend' && r.type !== 'reorder-line' && r.type !== 'truncate') {
     entries[idx] = r
+  }
+}
+
+// Drop everything past the cursor. Walk from the end so the loop short-circuits
+// the moment it hits an entry that survives.
+function dropAfter(entries: Resolved[], truncateAfterId: number): void {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i].id > truncateAfterId) entries.splice(i, 1)
+    else break
   }
 }
 
@@ -217,7 +227,7 @@ function resolveLogForDerivation(rawLog: RawEvent[]): Resolved[] {
   return resolveRawLog(rawLog, { keepReorderLine: true })
 }
 
-type UndoOrAmend = Extract<RawEvent, { type: 'undo' | 'amend' }>
+type StructuralOnly = Extract<RawEvent, { type: 'undo' | 'amend' | 'truncate' }>
 
 // ─── Game status (also derived) ───────────────────────────────────────────────
 // status is purely a function of the rawLog — there is no static "this game is
@@ -279,6 +289,7 @@ export function canRecord(state: DerivedGameState, eventType: RawEventType): boo
     case 'system':
     case 'undo':
     case 'amend':
+    case 'truncate':
       return true
   }
 }
