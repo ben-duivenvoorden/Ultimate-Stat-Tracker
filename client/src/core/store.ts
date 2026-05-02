@@ -5,6 +5,7 @@ import type {
   UiMode,
   TeamId,
   PlayerId,
+  EventId,
   Player,
   GameSession,
   RecordingOptions,
@@ -42,6 +43,12 @@ interface GameStore {
 
   // Transient (not persisted)
   showEventMenu: boolean
+  /** Cursor for the tap-to-truncate preview. null = live mode; otherwise the
+   *  eventId after which entries are greyed in the log and the canvas
+   *  reflects the state at that point. Cleared the moment new activity is
+   *  recorded — the action prepends a `truncate` event so the dropped tail
+   *  is committed atomically with whatever the user did next. */
+  truncateCursor: EventId | null
 
   // Game / session actions
   selectGame:        (gameId: number, pullingTeam: TeamId) => void
@@ -75,9 +82,10 @@ interface GameStore {
   updateRecordingOption: <K extends keyof RecordingOptions>(key: K, value: RecordingOptions[K]) => void
 
   // Pure UI
-  setShowEventMenu:  (show: boolean) => void
-  toggleSwapSides:   () => void
-  cyclePillSize:     () => void
+  setShowEventMenu:    (show: boolean) => void
+  toggleSwapSides:     () => void
+  cyclePillSize:       () => void
+  setTruncateCursor:   (cursor: EventId | null) => void
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
@@ -112,24 +120,44 @@ function sameLine(a: PlayerId[], b: PlayerId[]): boolean {
   return true
 }
 
+// Returns a session that looks as if it ended at the cursor. Used by
+// canRecord-via-recordVia and useDerivedState so both the record decision
+// and the on-screen state reflect the historical view.
+export function effectiveSession(session: GameSession, cursor: EventId | null): GameSession {
+  return cursor === null ? session : { ...session, rawLog: session.rawLog.filter(e => e.id <= cursor) }
+}
+
 // ─── recordVia ────────────────────────────────────────────────────────────────
-// Common funnel for actions that append events. Reads the derived state, lets
-// the caller's `build` decide whether to record (returning null aborts), then
-// commits the events plus any extra state in a single set(). Side-effect
-// fields like `selPuller` / `showEventMenu` go through `extra` so they only
-// fire on success — matching the pre-refactor per-action behaviour.
+// Common funnel for actions that append events. Reads the derived state at
+// the truncate cursor (or live), lets the caller's `build` decide whether to
+// record (returning null aborts), then commits the events plus any extra
+// state in a single set(). Side-effect fields like `selPuller` /
+// `showEventMenu` go through `extra` so they only fire on success — matching
+// the pre-refactor per-action behaviour.
+//
+// When the truncate cursor is set, a structural `truncate` event is prepended
+// so the dropped tail is committed atomically with whatever the user did
+// next, and the cursor clears. (Undoing while previewing produces
+// `[truncate, undo]` — drop forward, then nudge one more back.)
 function recordVia(
   get: () => GameStore,
   set: (partial: Partial<GameStore>) => void,
   build: (state: DerivedGameState) => RawEventInput[] | null,
   extra?: Partial<GameStore>,
 ): boolean {
-  const { session } = get()
+  const { session, truncateCursor } = get()
   if (!session) return false
-  const state = deriveGameState(session)
+  const state = deriveGameState(effectiveSession(session, truncateCursor))
   const events = build(state)
   if (!events || events.length === 0) return false
-  set({ session: appendEvents(session, events), ...extra })
+  const head: RawEventInput[] = truncateCursor !== null
+    ? [{ pointIndex: state.pointIndex, type: 'truncate', truncateAfterId: truncateCursor }]
+    : []
+  set({
+    session: appendEvents(session, [...head, ...events]),
+    truncateCursor: null,
+    ...extra,
+  })
   return true
 }
 
@@ -145,6 +173,7 @@ export const useGameStore = create<GameStore>()(
       uiMode:           'idle',
       selPuller:        null,
       showEventMenu:    false,
+      truncateCursor:   null,
       recordingOptions: DEFAULT_RECORDING_OPTIONS,
       swapSides:        false,
       pillSize:         'md',
@@ -156,11 +185,12 @@ export const useGameStore = create<GameStore>()(
         if (!session) return
         set({
           session,
-          screen:        'line-selection',
-          isInjurySub:   false,
-          uiMode:        'idle',
-          selPuller:     null,
-          showEventMenu: false,
+          screen:         'line-selection',
+          isInjurySub:    false,
+          uiMode:         'idle',
+          selPuller:      null,
+          showEventMenu:  false,
+          truncateCursor: null,
         })
       },
 
@@ -222,26 +252,30 @@ export const useGameStore = create<GameStore>()(
 
       // ── tapPlayer ───────────────────────────────────────────────────────────
       tapPlayer(player) {
-        const { session, uiMode } = get()
+        const { session, uiMode, truncateCursor } = get()
         if (!session) return
-        const state = deriveGameState(session)
+        // Branch on the cursor-aware state so the canvas tap matches what the
+        // user is looking at; recordVia takes care of the truncate prepend.
+        const state = deriveGameState(effectiveSession(session, truncateCursor))
 
-        // Pick-mode dispatch — registry-driven (see core/pickModes.ts)
+        // Pick-mode dispatch — registry-driven (see core/pickModes.ts).
+        // Pick triggers clear the cursor before this fires, so the cursor is
+        // null here and recordVia behaves like a normal append.
         if (isPickMode(uiMode)) {
-          const { onTap } = PICK_MODES[uiMode]
-          if (!canRecord(state, onTap.eventType)) return
-          // Receiver Error can't be the thrower — guard against UI bypass
-          if (onTap.eventType === 'turnover-receiver-error' && player.id === state.discHolder) return
-          const teamId = onTap.team === 'defending' ? otherTeam(state.possession) : state.possession
-          set({
-            session: appendEvents(session, [{
-              pointIndex: state.pointIndex,
+          const pickMode = uiMode
+          recordVia(get, set, s => {
+            const { onTap } = PICK_MODES[pickMode]
+            if (!canRecord(s, onTap.eventType)) return null
+            // Receiver Error can't be the thrower — guard against UI bypass
+            if (onTap.eventType === 'turnover-receiver-error' && player.id === s.discHolder) return null
+            const teamId = onTap.team === 'defending' ? otherTeam(s.possession) : s.possession
+            return [{
+              pointIndex: s.pointIndex,
               type:     onTap.eventType,
               playerId: player.id,
               teamId,
-            } as RawEventInput]),
-            uiMode: 'idle',
-          })
+            } as RawEventInput]
+          }, { uiMode: 'idle' })
           return
         }
 
@@ -321,11 +355,15 @@ export const useGameStore = create<GameStore>()(
       triggerReceiverError() {
         const { session } = get()
         if (!session) return
+        // Pick modes are tied to live state's holder/possession; entering one
+        // while previewing would point at stale players. Drop the preview so
+        // the pick reflects what's actually on the field.
         const state = deriveGameState(session)
         if (!canRecord(state, 'turnover-receiver-error') || !state.discHolder) return
         set({
-          uiMode: 'receiver-error-pick',
-          showEventMenu: false,
+          uiMode:         'receiver-error-pick',
+          showEventMenu:  false,
+          truncateCursor: null,
         })
       },
 
@@ -358,9 +396,11 @@ export const useGameStore = create<GameStore>()(
 
       // ── triggerDefBlock ─────────────────────────────────────────────────────
       triggerDefBlock(type) {
+        // Clear the preview — pick modes operate against live state.
         set({
-          uiMode: type === 'intercept' ? 'intercept-pick' : 'block-pick',
-          showEventMenu: false,
+          uiMode:         type === 'intercept' ? 'intercept-pick' : 'block-pick',
+          showEventMenu:  false,
+          truncateCursor: null,
         })
       },
 
@@ -396,13 +436,15 @@ export const useGameStore = create<GameStore>()(
 
       // ── triggerInjurySub ────────────────────────────────────────────────────
       // Injury subs skip the per-player tap and go straight to line selection,
-      // so multiple players can be swapped at once.
+      // so multiple players can be swapped at once. Clears the preview cursor
+      // so the line confirmation lands on live state, not the historical view.
       triggerInjurySub() {
         set({
-          screen:        'line-selection',
-          isInjurySub:   true,
-          showEventMenu: false,
-          uiMode:        'idle',
+          screen:         'line-selection',
+          isInjurySub:    true,
+          showEventMenu:  false,
+          uiMode:         'idle',
+          truncateCursor: null,
         })
       },
 
@@ -415,11 +457,12 @@ export const useGameStore = create<GameStore>()(
       // Advance from terminal state (point-over / half-time) to line selection.
       nextPoint() {
         set({
-          screen:        'line-selection',
-          isInjurySub:   false,
-          uiMode:        'idle',
-          selPuller:     null,
-          showEventMenu: false,
+          screen:         'line-selection',
+          isInjurySub:    false,
+          uiMode:         'idle',
+          selPuller:      null,
+          showEventMenu:  false,
+          truncateCursor: null,
         })
       },
 
@@ -441,11 +484,12 @@ export const useGameStore = create<GameStore>()(
       // Returns to game-setup, preserving the session so it can be viewed again.
       backToGameList() {
         set({
-          screen:        'game-setup',
-          uiMode:        'idle',
-          selPuller:     null,
-          showEventMenu: false,
-          isInjurySub:   false,
+          screen:         'game-setup',
+          uiMode:         'idle',
+          selPuller:      null,
+          showEventMenu:  false,
+          isInjurySub:    false,
+          truncateCursor: null,
         })
       },
 
@@ -523,6 +567,15 @@ export const useGameStore = create<GameStore>()(
       // preference — what feels right for thumbs / screen size.
       cyclePillSize() {
         set(s => ({ pillSize: PILL_SIZE_CYCLE[s.pillSize] }))
+      },
+
+      // ── setTruncateCursor ──────────────────────────────────────────────────
+      // Move (or clear) the tap-to-truncate cursor. Dropping the puller
+      // selection too — the previewed phase may not be awaiting-pull, and a
+      // stale selPuller would record under the wrong team if the user then
+      // taps Pull from the historical view.
+      setTruncateCursor(cursor) {
+        set({ truncateCursor: cursor, selPuller: null })
       },
     }),
     {

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
-import type { VisLogEntry, Player } from '@/core/types'
+import type { VisLogEntry, Player, EventId } from '@/core/types'
 import { formatVisLogEntry, getVisLogColor, isMutedLogEntry } from '@/core/format'
 import { Label } from '@/components/ui/Label'
 import { Btn } from '@/components/ui/Btn'
@@ -9,13 +9,19 @@ interface LogDrawerProps {
   visLog: VisLogEntry[]
   players: Player[]
   expanded: boolean
-  onToggle: () => void
-  onUndo: () => void
+  /** When set, entries with id > cursor are greyed/struck-through and the
+   *  cursor entry itself is marked with a thick border + ▶ glyph. */
+  truncateCursor: EventId | null
+  onToggle:    () => void
+  onUndo:      () => void
+  onSetCursor: (cursor: EventId | null) => void
 }
 
 export const LOG_DRAWER_W = 280
 
-export function LogDrawer({ visLog, players, expanded, onToggle, onUndo }: LogDrawerProps) {
+export function LogDrawer({
+  visLog, players, expanded, truncateCursor, onToggle, onUndo, onSetCursor,
+}: LogDrawerProps) {
   const logRef = useRef<HTMLDivElement>(null)
 
   // Pin the scroll to the most-recent entry whenever the log changes OR the
@@ -36,6 +42,13 @@ export function LogDrawer({ visLog, players, expanded, onToggle, onUndo }: LogDr
       width={LOG_DRAWER_W}
       onToggle={onToggle}
       rail={<LogRailIcon />}
+      footer={
+        // Hoisted out of the panel so Undo is one tap away whether the
+        // drawer is collapsed or expanded.
+        <div className="flex-shrink-0 p-1.5" style={{ borderTop: '1px solid var(--color-border)' }}>
+          <Btn variant="ghost" size="sm" full onClick={onUndo}>↩ Undo</Btn>
+        </div>
+      }
     >
       <div
         className="flex-shrink-0 h-7 flex items-center justify-center px-2.5"
@@ -49,28 +62,31 @@ export function LogDrawer({ visLog, players, expanded, onToggle, onUndo }: LogDr
           <Label className="py-2 text-center block">No events yet</Label>
         ) : (
           visLog.map(e => {
-            const color = getVisLogColor(e.type)
-            const muted = isMutedLogEntry(e.type)
+            const color    = getVisLogColor(e.type)
+            const muted    = isMutedLogEntry(e.type)
+            const past     = truncateCursor !== null && e.id > truncateCursor
+            const isCursor = truncateCursor !== null && e.id === truncateCursor
             return (
               <div
                 key={e.id}
-                className="py-1 px-2 rounded text-[11px] border-l-2 text-center"
+                onClick={() => onSetCursor(isCursor ? null : e.id)}
+                className="py-1 px-2 rounded text-[11px] text-center cursor-pointer"
                 style={{
-                  borderLeftColor: color,
+                  borderLeft: `${isCursor ? 3 : 2}px solid ${color}`,
                   background: `${color}12`,
                   color: muted ? 'var(--color-muted)' : color,
                   fontFamily: e.type === 'system' || e.type === 'point-start' ? 'var(--font-mono)' : 'var(--font-sans)',
+                  opacity: past ? 0.4 : 1,
+                  textDecoration: past ? 'line-through' : 'none',
                 }}
+                title={isCursor ? 'Tap to cancel preview' : 'Tap to preview state at this event'}
               >
+                {isCursor && <span style={{ marginRight: 4 }}>▶</span>}
                 {formatVisLogEntry(e, players)}
               </div>
             )
           })
         )}
-      </div>
-
-      <div className="flex-shrink-0 p-1.5" style={{ borderTop: '1px solid var(--color-border)' }}>
-        <Btn variant="ghost" size="sm" full onClick={onUndo}>↩ Undo</Btn>
       </div>
     </Drawer>
   )

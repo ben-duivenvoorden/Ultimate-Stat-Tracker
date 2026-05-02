@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { useGameStore } from './store'
+import { useGameStore, effectiveSession } from './store'
 import { computeVisLog, deriveGameState } from './engine'
 import { MOCK_GAMES } from './data'
-import type { DerivedGameState, VisLogEntry, GameSession, RecordingOptions } from './types'
+import type { DerivedGameState, VisLogEntry, GameSession, RecordingOptions, EventId } from './types'
 import { DEFAULT_RECORDING_OPTIONS } from './types'
 
 // Refresh the persisted session's gameConfig from current MOCK_GAMES so
@@ -25,12 +25,22 @@ export function useSession(): GameSession | null {
 
 export function useDerivedState(): DerivedGameState | null {
   const session = useSession()
-  return useMemo(() => (session ? deriveGameState(session) : null), [session])
+  const cursor  = useTruncateCursor()
+  return useMemo(() => {
+    if (!session) return null
+    return deriveGameState(effectiveSession(session, cursor))
+  }, [session, cursor])
 }
 
+// LogDrawer needs the full visible log so it can render greyed entries past
+// the cursor. Filter at the call site if you need the cursor-aware view.
 export function useVisLog(): VisLogEntry[] {
   const session = useSession()
   return useMemo(() => (session ? computeVisLog(session.rawLog) : []), [session])
+}
+
+export function useTruncateCursor(): EventId | null {
+  return useGameStore(s => s.truncateCursor)
 }
 
 // ─── Action accessor ──────────────────────────────────────────────────────────

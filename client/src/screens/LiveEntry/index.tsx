@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   useSession, useDerivedState, useVisLog, useGameActions, useUiState, useRecordingOptions,
+  useTruncateCursor,
 } from '@/core/selectors'
 import { useGameStore } from '@/core/store'
 import { otherTeam, type Player, type TeamId, type VisLogEntry } from '@/core/types'
@@ -87,6 +88,7 @@ export default function LiveEntry() {
   const swapSides        = useGameStore(s => s.swapSides)
   const pillSize         = useGameStore(s => s.pillSize)
   const stageSize        = useStageSize()
+  const truncateCursor   = useTruncateCursor()
 
   // One drawer at most may be expanded at a time; toggling one collapses the
   // other. Drawers reserve their own width in the flex row, so the canvas
@@ -117,9 +119,17 @@ export default function LiveEntry() {
     [state, activeTeam],
   )
 
+  // The full visLog still drives the LogDrawer (so greyed entries past the
+  // cursor render). Anything that should reflect the historical view —
+  // arrows, first-possession chip gating — gets the cursor-filtered version.
+  const effectiveVisLog = useMemo(
+    () => (truncateCursor === null ? visLog : visLog.filter(e => e.id <= truncateCursor)),
+    [visLog, truncateCursor],
+  )
+
   const arrows = useMemo(
-    () => (activeTeam ? derivePassArrows(visLog, activeTeam, activePlayers) : []),
-    [visLog, activeTeam, activePlayers],
+    () => (activeTeam ? derivePassArrows(effectiveVisLog, activeTeam, activePlayers) : []),
+    [effectiveVisLog, activeTeam, activePlayers],
   )
 
   // Goal and Receiver Error are disabled until the team has recorded at
@@ -127,16 +137,19 @@ export default function LiveEntry() {
   // the in-play phase (pull-phase chips and pick-mode have their own gates).
   const disabledChipIds = useMemo<ReadonlySet<ChipId>>(() => {
     if (!activeTeam || pickMode || phase !== 'in-play') return NO_DISABLED
-    return isFirstPossession(visLog, activeTeam)
+    return isFirstPossession(effectiveVisLog, activeTeam)
       ? FIRST_POSSESSION_DISABLED
       : NO_DISABLED
-  }, [visLog, activeTeam, pickMode, phase])
+  }, [effectiveVisLog, activeTeam, pickMode, phase])
 
-  // Auto-navigate to LineSelection after a goal or half-time. game-over stays
-  // on the canvas with an inline banner (no end-game screen yet).
+  // Auto-navigate to LineSelection after a goal or half-time. Skip while
+  // previewing — otherwise rewinding to the moment of a goal would silently
+  // navigate the user out of LiveEntry. Cancelling the preview re-runs this
+  // against live state.
   useEffect(() => {
+    if (truncateCursor !== null) return
     if (phase === 'point-over' || phase === 'half-time') actions.nextPoint()
-  }, [phase, actions])
+  }, [phase, actions, truncateCursor])
 
   if (!session || !state || !activeTeam) return null
 
@@ -155,7 +168,10 @@ export default function LiveEntry() {
   // from the canvas. Compute the actual stage area = window - drawer widths
   // - header. Centre is the midpoint of that area; the Stage's coordinate
   // system is its parent's local space.
-  const headerH = HEADER_H + (pickMode ? PICK_STRIP_H : 0)
+  const previewing = truncateCursor !== null
+  // History strip and pick strip mutually exclude (entering a pick mode
+  // clears the cursor) — adding one strip's height is enough.
+  const headerH = HEADER_H + (pickMode || previewing ? PICK_STRIP_H : 0)
   const leftDrawerW  = adminExpanded ? ADMIN_DRAWER_W : DRAWER_RAIL_W
   const rightDrawerW = logExpanded   ? LOG_DRAWER_W   : DRAWER_RAIL_W
   const stageW  = Math.max(0, stageSize.w - leftDrawerW - rightDrawerW)
@@ -200,6 +216,22 @@ export default function LiveEntry() {
         onSwap={actions.toggleSwapSides}
         onCancelPickMode={actions.cancelPickMode}
       />
+
+      {previewing && (
+        // Same vocabulary as the pick-mode strip — tap to cancel the rewind.
+        <button
+          onClick={() => actions.setTruncateCursor(null)}
+          className="flex-shrink-0 h-8 w-full flex items-center justify-center text-[11px] font-semibold tracking-widest cursor-pointer transition-colors"
+          style={{
+            background: 'var(--color-warn-bg)',
+            color: 'var(--color-warn)',
+            borderBottom: '1px solid var(--color-warn)',
+          }}
+          title="Tap to cancel preview"
+        >
+          VIEWING HISTORY · RECORD TO TRUNCATE FORWARD · TAP TO CANCEL
+        </button>
+      )}
 
       {/*
         Layout: AdminDrawer | Stage | LogDrawer (flex row).
@@ -255,8 +287,10 @@ export default function LiveEntry() {
           visLog={visLog}
           players={[...session.gameConfig.rosters.A, ...session.gameConfig.rosters.B]}
           expanded={logExpanded}
+          truncateCursor={truncateCursor}
           onToggle={() => toggleDrawer('log')}
           onUndo={actions.undo}
+          onSetCursor={actions.setTruncateCursor}
         />
       </div>
     </div>
