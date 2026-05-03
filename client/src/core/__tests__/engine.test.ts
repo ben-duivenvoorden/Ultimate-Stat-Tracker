@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { computeVisLog, deriveGameState, canRecord, appendEvents } from '../engine'
-import type { GameSession, RawEvent } from '../types'
+import { computeVisLog, deriveGameState, canRecord, appendEvents, validateSpliceBlock } from '../engine'
+import type { GameSession, RawEvent, SpliceBlockRawEvent } from '../types'
 import { MOCK_GAMES } from '../data'
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
@@ -367,5 +367,201 @@ describe('truncate', () => {
     ])
     const vis = computeVisLog(session.rawLog)
     expect(vis.map(e => e.type)).toEqual(['point-start', 'pull'])
+  })
+})
+
+// ─── splice-block ─────────────────────────────────────────────────────────────
+
+function buildSplice(args: {
+  id: number
+  afterEventId: number
+  removeFromId?: number | null
+  removeToId?:   number | null
+  events: RawEvent[]
+}): SpliceBlockRawEvent {
+  return {
+    id: args.id,
+    timestamp: 0,
+    pointIndex: 0,
+    type: 'splice-block',
+    afterEventId: args.afterEventId,
+    removeFromId: args.removeFromId ?? null,
+    removeToId:   args.removeToId   ?? null,
+    events: args.events,
+  }
+}
+
+describe('splice-block resolution', () => {
+  it('pure insert (paste): events appear after anchor in the resolved log', () => {
+    let session = makeSession('A')
+    session = appendEvents(session, [
+      startPoint(0),                                                    // 1
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },        // 2
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' }, // 3
+    ])
+    // Splice in a possession after id 3 (extra pass to id 15).
+    const inner: RawEvent = {
+      id: 100, timestamp: 0, pointIndex: 0,
+      type: 'possession', playerId: 15, teamId: 'B',
+    }
+    const splice = buildSplice({ id: 200, afterEventId: 3, events: [inner] })
+    const vis = computeVisLog([...session.rawLog, splice])
+    expect(vis.map(e => e.id)).toEqual([1, 2, 3, 100])
+    expect((vis[3] as { playerId: number }).playerId).toBe(15)
+  })
+
+  it('replace: drops range entries and inserts new ones', () => {
+    let session = makeSession('A')
+    session = appendEvents(session, [
+      startPoint(0),                                                    // 1
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },        // 2
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' }, // 3
+      { pointIndex: 0, type: 'possession', playerId: 15, teamId: 'B' }, // 4
+      { pointIndex: 0, type: 'possession', playerId: 16, teamId: 'B' }, // 5
+    ])
+    const inner: RawEvent = {
+      id: 100, timestamp: 0, pointIndex: 0,
+      type: 'possession', playerId: 17, teamId: 'B',
+    }
+    const splice = buildSplice({
+      id: 200, afterEventId: 2, removeFromId: 3, removeToId: 5, events: [inner],
+    })
+    const vis = computeVisLog([...session.rawLog, splice])
+    expect(vis.map(e => e.id)).toEqual([1, 2, 100])
+    expect((vis[2] as { playerId: number }).playerId).toBe(17)
+  })
+
+  it('delete: range removed with no inner events', () => {
+    let session = makeSession('A')
+    session = appendEvents(session, [
+      startPoint(0),                                                    // 1
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },        // 2
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' }, // 3
+      { pointIndex: 0, type: 'possession', playerId: 15, teamId: 'B' }, // 4
+    ])
+    const splice = buildSplice({
+      id: 200, afterEventId: 2, removeFromId: 3, removeToId: 4, events: [],
+    })
+    const vis = computeVisLog([...session.rawLog, splice])
+    expect(vis.map(e => e.id)).toEqual([1, 2])
+  })
+
+  it('corrupt anchor (id not found): splice is dropped silently', () => {
+    let session = makeSession('A')
+    session = appendEvents(session, [startPoint(0)])
+    const splice = buildSplice({ id: 200, afterEventId: 9999, events: [] })
+    const vis = computeVisLog([...session.rawLog, splice])
+    expect(vis.map(e => e.id)).toEqual([1])
+  })
+
+  it('deriveGameState reflects spliced events', () => {
+    let session = makeSession('A')
+    session = appendEvents(session, [
+      startPoint(0),                                                    // 1
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },        // 2
+    ])
+    const inner: RawEvent[] = [
+      { id: 100, timestamp: 0, pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' },
+      { id: 101, timestamp: 0, pointIndex: 0, type: 'goal',       playerId: 14, teamId: 'B' },
+    ]
+    const splice = buildSplice({ id: 200, afterEventId: 2, events: inner })
+    const state = deriveGameState({ ...session, rawLog: [...session.rawLog, splice] })
+    expect(state.score).toEqual({ A: 0, B: 1 })
+    expect(state.gamePhase).toBe('point-over')
+  })
+})
+
+describe('validateSpliceBlock', () => {
+  function basePulled(): GameSession {
+    let session = makeSession('A')
+    session = appendEvents(session, [
+      startPoint(0),                                                    // 1
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },        // 2
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' }, // 3
+      { pointIndex: 0, type: 'possession', playerId: 15, teamId: 'B' }, // 4
+      { pointIndex: 0, type: 'possession', playerId: 16, teamId: 'B' }, // 5
+    ])
+    return session
+  }
+
+  it('accepts a valid mid-point insert (extra pass)', () => {
+    const session = basePulled()
+    const inner: RawEvent = {
+      id: 100, timestamp: 0, pointIndex: 0,
+      type: 'possession', playerId: 17, teamId: 'B',
+    }
+    const splice = buildSplice({ id: 200, afterEventId: 4, events: [inner] })
+    expect(validateSpliceBlock(session, splice)).toEqual({ ok: true })
+  })
+
+  it('rejects a pull mid-play', () => {
+    const session = basePulled()
+    const inner: RawEvent = {
+      id: 100, timestamp: 0, pointIndex: 0,
+      type: 'pull', playerId: 1, teamId: 'A',
+    }
+    const splice = buildSplice({ id: 200, afterEventId: 4, events: [inner] })
+    const result = validateSpliceBlock(session, splice)
+    expect(result.ok).toBe(false)
+    expect((result as { reason: string }).reason).toMatch(/cannot record pull/)
+  })
+
+  it('rejects wrong-team puller after a goal', () => {
+    let session = makeSession('A')
+    session = appendEvents(session, [
+      startPoint(0),                                                    // 1
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },        // 2
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' }, // 3
+      { pointIndex: 0, type: 'goal',       playerId: 14, teamId: 'B' }, // 4
+    ])
+    // After B scored, B should pull next. A illegal-puller event would fail.
+    const inner: RawEvent = {
+      id: 100, timestamp: 0, pointIndex: 1,
+      type: 'pull', playerId: 1, teamId: 'A',
+    }
+    // Need a point-start event between goal and pull. Use a fresh point-start
+    // so the splice anchors after the goal to begin a new point.
+    const psInner: RawEvent = {
+      id: 99, timestamp: 0, pointIndex: 1,
+      type: 'point-start', lineA: LINE_A_IDS, lineB: LINE_B_IDS,
+    }
+    const splice = buildSplice({ id: 200, afterEventId: 4, events: [psInner, inner] })
+    const result = validateSpliceBlock(session, splice)
+    expect(result.ok).toBe(false)
+    expect((result as { reason: string }).reason).toMatch(/pulling team mismatch/)
+  })
+
+  it('accepts a valid splice at end (no trailing tail)', () => {
+    const session = basePulled()
+    // After id 5, in-play, B has disc. A goal by 16 is legal.
+    const inner: RawEvent = {
+      id: 100, timestamp: 0, pointIndex: 0,
+      type: 'goal', playerId: 16, teamId: 'B',
+    }
+    const splice = buildSplice({ id: 200, afterEventId: 5, events: [inner] })
+    expect(validateSpliceBlock(session, splice)).toEqual({ ok: true })
+  })
+
+  it('rejects replace that breaks trailing possession', () => {
+    // Replace mid-chain with a turnover — that flips possession to A.
+    // The trailing possession-by-B event becomes inconsistent.
+    const inner: RawEvent = {
+      id: 100, timestamp: 0, pointIndex: 0,
+      type: 'turnover-throw-away', playerId: 14, teamId: 'B',
+    }
+    let s2 = makeSession('A')
+    s2 = appendEvents(s2, [
+      startPoint(0),                                                    // 1
+      { pointIndex: 0, type: 'pull', playerId: 1, teamId: 'A' },        // 2
+      { pointIndex: 0, type: 'possession', playerId: 14, teamId: 'B' }, // 3
+      { pointIndex: 0, type: 'possession', playerId: 15, teamId: 'B' }, // 4
+      { pointIndex: 0, type: 'possession', playerId: 16, teamId: 'B' }, // 5
+    ])
+    const splice = buildSplice({
+      id: 200, afterEventId: 3, removeFromId: 4, removeToId: 4, events: [inner],
+    })
+    const result = validateSpliceBlock(s2, splice)
+    expect(result.ok).toBe(false)
+    expect((result as { reason: string }).reason).toMatch(/possession team mismatch|cannot continue/i)
   })
 })

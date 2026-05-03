@@ -60,6 +60,7 @@ export type RawEventType =
   | 'amend'
   | 'truncate'                 // drops every event with id > truncateAfterId
                                // — used by tap-to-truncate to commit a rewind
+  | 'splice-block'             // structural insert/replace/delete in the resolved log
 
 interface BaseRawEvent {
   id: EventId
@@ -91,6 +92,23 @@ export interface AmendRawEvent      extends BaseRawEvent { type: 'amend'; target
 // resolved entry whose id > truncateAfterId, then carries on with whatever
 // events follow in the rawLog.
 export interface TruncateRawEvent   extends BaseRawEvent { type: 'truncate'; truncateAfterId: EventId }
+// Structural splice on the resolved log: removes resolved entries whose ids
+// fall in [removeFromId..removeToId] and inserts `events` immediately after
+// the resolved entry with id === afterEventId.
+// - removeFromId/ToId both null, events.length > 0 → insert (paste)
+// - removeFromId/ToId set, events.length === N      → replace
+// - removeFromId/ToId set, events.length === 0      → delete
+// The id-range form is unambiguous across resolve passes (visible log vs
+// derivation) — index counts could diverge if reorder-line entries fall in
+// the range. Inner events get fresh ids when the splice is committed via
+// appendEvents.
+export interface SpliceBlockRawEvent extends BaseRawEvent {
+  type:         'splice-block'
+  afterEventId: EventId
+  removeFromId: EventId | null
+  removeToId:   EventId | null
+  events:       RawEvent[]
+}
 
 export type RawEvent =
   | PointStartRawEvent
@@ -110,13 +128,14 @@ export type RawEvent =
   | UndoRawEvent
   | AmendRawEvent
   | TruncateRawEvent
+  | SpliceBlockRawEvent
 
 // ─── Visual log ───────────────────────────────────────────────────────────────
 // Same shape as RawEvent minus structural-only entries (undo/amend/truncate
 // resolve into the visible list; reorder-line is purely a display directive).
 // Structured — no formatted strings. UI layer formats via format.ts.
 
-export type VisLogEntry = Exclude<RawEvent, UndoRawEvent | AmendRawEvent | LineReorderRawEvent | TruncateRawEvent>
+export type VisLogEntry = Exclude<RawEvent, UndoRawEvent | AmendRawEvent | LineReorderRawEvent | TruncateRawEvent | SpliceBlockRawEvent>
 
 // ─── Derived game state ───────────────────────────────────────────────────────
 
@@ -149,6 +168,32 @@ export type UiMode =
   | 'receiver-error-pick' // recorder tapped "Receiver Error", picking player who had error
 
 export type AppScreen = 'game-setup' | 'game-settings' | 'line-selection' | 'live-entry'
+
+// ─── Transient banner notification ────────────────────────────────────────────
+// Shared by copy / paste / edit-commit flows. One banner at a time; tap to
+// dismiss. Auto-clears via setTimeout.
+
+export interface Notification {
+  kind:      'success' | 'failure'
+  message:   string
+  detail?:   string
+  expiresAt: number
+}
+
+// ─── Edit mode (transient — not persisted) ────────────────────────────────────
+// Entry: GameOverBanner → "Edit log". The recording UI operates against the
+// draftSession via the useSession selector. On Done, the draftEvents collected
+// since the range was removed are committed as a splice-block on the
+// baselineSession. Cancel discards everything.
+
+export interface EditModeState {
+  active:          true
+  baselineSession: GameSession    // snapshot at the moment edit-mode opened
+  draftSession:    GameSession    // working copy that the recording controls operate on
+  removeFromId:    EventId | null // first id of the selected replace range
+  removeToId:      EventId | null // last id of the selected replace range
+  draftEvents:     RawEvent[]     // events appended to draftSession since the range was removed
+}
 
 // ─── Recording options ────────────────────────────────────────────────────────
 

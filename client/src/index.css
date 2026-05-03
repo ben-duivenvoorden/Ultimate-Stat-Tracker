@@ -27,10 +27,11 @@
   --color-team-b:   #ff6640;
 
   /* Semantic */
-  --color-success:  #3dba78;
-  --color-warn:     #f5a623;
-  --color-warn-bg:  #1a0f00;
-  --color-danger:   #ff4d4d;
+  --color-success:    #3dba78;
+  --color-success-bg: #0a1f12;
+  --color-warn:       #f5a623;
+  --color-warn-bg:    #1a0f00;
+  --color-danger:     #ff4d4d;
   /* Block + Intercept: same hue (purple), different shades. Block is the
    * darker base; Intercept is the lighter sibling. */
   --color-block:         #7d4eea;

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   useSession, useDerivedState, useVisLog, useGameActions, useUiState, useRecordingOptions,
-  useTruncateCursor,
+  useTruncateCursor, useEditMode, useNotification, useLiveSession,
 } from '@/core/selectors'
 import { useGameStore } from '@/core/store'
-import { otherTeam, type Player, type TeamId, type VisLogEntry } from '@/core/types'
+import { computeVisLog } from '@/core/engine'
+import { tryParse } from '@/core/clipboard'
+import { otherTeam, type EventId, type Player, type TeamId, type VisLogEntry } from '@/core/types'
 import { isPickMode, pickActiveTeam } from '@/core/pickModes'
 import { Header } from './Header'
 import { Stage, type StageMode } from './Canvas/Stage'
@@ -80,6 +82,7 @@ const PICK_STRIP_H = 32      // h-8
 export default function LiveEntry() {
   // ── All hooks declared up front (no conditional hooks) ───────────────────
   const session          = useSession()
+  const liveSession      = useLiveSession()
   const state            = useDerivedState()
   const visLog           = useVisLog()
   const ui               = useUiState()
@@ -89,6 +92,31 @@ export default function LiveEntry() {
   const pillSize         = useGameStore(s => s.pillSize)
   const stageSize        = useStageSize()
   const truncateCursor   = useTruncateCursor()
+  const editMode         = useEditMode()
+  const notification     = useNotification()
+  const [clipboardReady, setClipboardReady] = useState(false)
+
+  // Probe the clipboard for a UST log slice belonging to this game. Re-checks
+  // on focus + on a short cadence while the drawer is interactive. Failures
+  // (e.g. permission denied) silently leave clipboardReady at false.
+  useEffect(() => {
+    if (!liveSession) return
+    let cancelled = false
+    const check = async () => {
+      try {
+        const text = await navigator.clipboard.readText()
+        if (cancelled) return
+        const env = tryParse(text)
+        setClipboardReady(env !== null && env.gameId === liveSession.gameConfig.id)
+      } catch {
+        if (!cancelled) setClipboardReady(false)
+      }
+    }
+    check()
+    const onFocus = () => { void check() }
+    window.addEventListener('focus', onFocus)
+    return () => { cancelled = true; window.removeEventListener('focus', onFocus) }
+  }, [liveSession])
 
   // One drawer at most may be expanded at a time; toggling one collapses the
   // other. Drawers reserve their own width in the flex row, so the canvas
@@ -169,9 +197,14 @@ export default function LiveEntry() {
   // - header. Centre is the midpoint of that area; the Stage's coordinate
   // system is its parent's local space.
   const previewing = truncateCursor !== null
-  // History strip and pick strip mutually exclude (entering a pick mode
-  // clears the cursor) — adding one strip's height is enough.
-  const headerH = HEADER_H + (pickMode || previewing ? PICK_STRIP_H : 0)
+  const editActive = !!editMode?.active
+  const editRange  = editActive && editMode?.removeFromId !== null && editMode?.removeToId !== null
+    ? { from: editMode.removeFromId, to: editMode.removeToId }
+    : null
+  // History strip / pick strip / edit strip mutually exclude — pick clears
+  // the cursor, edit replaces both — so adding one strip's height is enough.
+  const stripActive = !!pickMode || previewing || editActive
+  const headerH = HEADER_H + (stripActive ? PICK_STRIP_H : 0)
   const leftDrawerW  = adminExpanded ? ADMIN_DRAWER_W : DRAWER_RAIL_W
   const rightDrawerW = logExpanded   ? LOG_DRAWER_W   : DRAWER_RAIL_W
   const stageW  = Math.max(0, stageSize.w - leftDrawerW - rightDrawerW)
@@ -204,6 +237,29 @@ export default function LiveEntry() {
 
   const isGameOver = phase === 'game-over'
 
+  // Long-press dispatch — one gesture, three meanings:
+  //   1. Edit mode active → set the replace range from the truncate cursor
+  //      (or from the same id, if no cursor) to the long-pressed entry.
+  //   2. Truncate cursor set → copy slice [cursor..pressed] to clipboard.
+  //   3. Clipboard is a UST log slice for this game → paste after pressed.
+  const onLongPress = (entryId: EventId) => {
+    if (editActive) {
+      const fromId = truncateCursor ?? entryId
+      void actions.setEditRange(fromId, entryId)
+      return
+    }
+    if (truncateCursor !== null) {
+      void actions.copySliceToClipboard(truncateCursor, entryId)
+      return
+    }
+    if (clipboardReady) {
+      void actions.pasteFromClipboard(entryId)
+      return
+    }
+    // Fall-through: solo long-press with empty clipboard = copy that single entry.
+    void actions.copySliceToClipboard(entryId, entryId)
+  }
+
   return (
     <div className="h-full flex flex-col" style={{ background: 'var(--color-bg)' }}>
       <Header
@@ -217,7 +273,60 @@ export default function LiveEntry() {
         onCancelPickMode={actions.cancelPickMode}
       />
 
-      {previewing && (
+      {notification && (
+        <button
+          onClick={actions.dismissNotification}
+          className="flex-shrink-0 w-full px-3 py-1.5 text-[11px] font-semibold cursor-pointer text-left"
+          style={{
+            background: notification.kind === 'success' ? 'var(--color-success-bg)' : 'var(--color-warn-bg)',
+            color:      notification.kind === 'success' ? 'var(--color-success)'                    : 'var(--color-warn)',
+            borderBottom: `1px solid ${notification.kind === 'success' ? 'var(--color-success)' : 'var(--color-warn)'}`,
+          }}
+          title="Tap to dismiss"
+        >
+          {notification.message}
+          {notification.detail && (
+            <span style={{ opacity: 0.75, marginLeft: 8, fontWeight: 400 }}>· {notification.detail}</span>
+          )}
+        </button>
+      )}
+
+      {editActive && (
+        <div
+          className="flex-shrink-0 h-8 w-full flex items-stretch text-[11px] font-semibold tracking-widest"
+          style={{
+            background: 'var(--color-warn-bg)',
+            color:      'var(--color-warn)',
+            borderBottom: '1px solid var(--color-warn)',
+          }}
+        >
+          <div className="flex-1 flex items-center justify-center">
+            {editMode?.removeFromId !== null && editMode?.removeToId !== null
+              ? `EDITING #${editMode.removeFromId}–#${editMode.removeToId}`
+              : 'EDIT MODE — select range to replace'}
+          </div>
+          {editMode?.removeFromId !== null && editMode?.removeToId !== null && (
+            <button
+              onClick={() => actions.commitEdit()}
+              className="px-3 cursor-pointer"
+              style={{ borderLeft: '1px solid var(--color-warn)' }}
+              title="Commit the edit"
+            >
+              DONE
+            </button>
+          )}
+          <button
+            onClick={() => actions.cancelEdit()}
+            className="px-3 cursor-pointer"
+            style={{ borderLeft: '1px solid var(--color-warn)' }}
+            title="Discard edit"
+          >
+            CANCEL
+          </button>
+        </div>
+      )}
+
+      {previewing && !editActive && (
         // Same vocabulary as the pick-mode strip — tap to cancel the rewind.
         <button
           onClick={() => actions.setTruncateCursor(null)}
@@ -257,7 +366,12 @@ export default function LiveEntry() {
 
         <div className="flex-1 relative overflow-hidden" style={{ minWidth: 0 }}>
           {isGameOver ? (
-            <GameOverBanner score={state.score} teams={teams} onBack={actions.backToGameList} />
+            <GameOverBanner
+              score={state.score}
+              teams={teams}
+              onBack={actions.backToGameList}
+              onEdit={editActive ? undefined : actions.beginEdit}
+            />
           ) : (
             <Stage
               // Re-key on team change so Stage remounts cleanly (physics + arrows reset).
@@ -284,13 +398,20 @@ export default function LiveEntry() {
         </div>
 
         <LogDrawer
-          visLog={visLog}
+          // In edit mode, show the baseline log so the user can see the range
+          // they're replacing (rendered with strike-through). Fresh draft
+          // events aren't visible until commit — accepted tradeoff for v1.
+          visLog={editActive && editMode ? computeVisLog(editMode.baselineSession.rawLog) : visLog}
           players={[...session.gameConfig.rosters.A, ...session.gameConfig.rosters.B]}
           expanded={logExpanded}
-          truncateCursor={truncateCursor}
+          truncateCursor={editActive ? null : truncateCursor}
+          editRange={editRange}
+          clipboardReady={clipboardReady}
+          editActive={editActive}
           onToggle={() => toggleDrawer('log')}
           onUndo={actions.undo}
           onSetCursor={actions.setTruncateCursor}
+          onLongPress={onLongPress}
         />
       </div>
     </div>
@@ -298,11 +419,12 @@ export default function LiveEntry() {
 }
 
 function GameOverBanner({
-  score, teams, onBack,
+  score, teams, onBack, onEdit,
 }: {
   score: { A: number; B: number }
   teams: Record<TeamId, { name: string; short: string; color: string }>
   onBack: () => void
+  onEdit?: () => void
 }) {
   const winner: TeamId = score.A >= score.B ? 'A' : 'B'
   return (
@@ -313,7 +435,10 @@ function GameOverBanner({
           {score.A} – {score.B}
         </div>
         <div className="text-sm text-muted">{teams[winner].name} wins</div>
-        <Btn variant="ghost" size="md" onClick={onBack}>Back to games</Btn>
+        <div className="flex gap-2">
+          <Btn variant="ghost" size="md" onClick={onBack}>Back to games</Btn>
+          {onEdit && <Btn variant="ghost" size="md" onClick={onEdit}>Edit log</Btn>}
+        </div>
       </div>
     </div>
   )

@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useGameStore, effectiveSession } from './store'
 import { computeVisLog, deriveGameState } from './engine'
 import { MOCK_GAMES } from './data'
-import type { DerivedGameState, VisLogEntry, GameSession, RecordingOptions, EventId } from './types'
+import type { DerivedGameState, VisLogEntry, GameSession, RecordingOptions, EventId, Notification, EditModeState } from './types'
 import { DEFAULT_RECORDING_OPTIONS } from './types'
 
 // Refresh the persisted session's gameConfig from current MOCK_GAMES so
@@ -17,10 +17,30 @@ function resolveSession(session: GameSession): GameSession {
 }
 
 // Single subscription to the session — re-derives only when session reference changes.
+//
+// When edit mode is active, the recording controls operate against the draft.
+// The selector returns the draft so the entire LiveEntry UI works against it
+// for free; the live session is read from useLiveSession when needed.
 
 export function useSession(): GameSession | null {
   const stored = useGameStore(s => s.session)
+  const draft  = useGameStore(s => s.editMode?.draftSession ?? null)
+  const active = draft ?? stored
+  return useMemo(() => (active ? resolveSession(active) : null), [active])
+}
+
+/** The persisted live session, ignoring any edit-mode draft. */
+export function useLiveSession(): GameSession | null {
+  const stored = useGameStore(s => s.session)
   return useMemo(() => (stored ? resolveSession(stored) : null), [stored])
+}
+
+export function useEditMode(): EditModeState | null {
+  return useGameStore(s => s.editMode)
+}
+
+export function useNotification(): Notification | null {
+  return useGameStore(s => s.notification)
 }
 
 export function useDerivedState(): DerivedGameState | null {
