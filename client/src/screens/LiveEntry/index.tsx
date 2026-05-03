@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   useSession, useDerivedState, useVisLog, useGameActions, useUiState, useRecordingOptions,
-  useTruncateCursor, useEditMode, useNotification, useLiveSession,
+  useTruncateCursor, useEditMode, useNotification,
 } from '@/core/selectors'
 import { useGameStore } from '@/core/store'
 import { computeVisLog } from '@/core/engine'
-import { tryParse } from '@/core/clipboard'
 import { otherTeam, type EventId, type Player, type TeamId, type VisLogEntry } from '@/core/types'
 import { isPickMode, pickActiveTeam } from '@/core/pickModes'
 import { Header } from './Header'
@@ -82,41 +81,16 @@ const PICK_STRIP_H = 32      // h-8
 export default function LiveEntry() {
   // ── All hooks declared up front (no conditional hooks) ───────────────────
   const session          = useSession()
-  const liveSession      = useLiveSession()
   const state            = useDerivedState()
   const visLog           = useVisLog()
   const ui               = useUiState()
   const actions          = useGameActions()
   const recordingOptions = useRecordingOptions()
-  const swapSides        = useGameStore(s => s.swapSides)
   const pillSize         = useGameStore(s => s.pillSize)
   const stageSize        = useStageSize()
   const truncateCursor   = useTruncateCursor()
   const editMode         = useEditMode()
   const notification     = useNotification()
-  const [clipboardReady, setClipboardReady] = useState(false)
-
-  // Probe the clipboard for a UST log slice belonging to this game. Re-checks
-  // on focus + on a short cadence while the drawer is interactive. Failures
-  // (e.g. permission denied) silently leave clipboardReady at false.
-  useEffect(() => {
-    if (!liveSession) return
-    let cancelled = false
-    const check = async () => {
-      try {
-        const text = await navigator.clipboard.readText()
-        if (cancelled) return
-        const env = tryParse(text)
-        setClipboardReady(env !== null && env.gameId === liveSession.gameConfig.id)
-      } catch {
-        if (!cancelled) setClipboardReady(false)
-      }
-    }
-    check()
-    const onFocus = () => { void check() }
-    window.addEventListener('focus', onFocus)
-    return () => { cancelled = true; window.removeEventListener('focus', onFocus) }
-  }, [liveSession])
 
   // One drawer at most may be expanded at a time; toggling one collapses the
   // other. Drawers reserve their own width in the flex row, so the canvas
@@ -237,27 +211,27 @@ export default function LiveEntry() {
 
   const isGameOver = phase === 'game-over'
 
-  // Long-press dispatch — one gesture, three meanings:
-  //   1. Edit mode active → set the replace range from the truncate cursor
-  //      (or from the same id, if no cursor) to the long-pressed entry.
-  //   2. Truncate cursor set → copy slice [cursor..pressed] to clipboard.
-  //   3. Clipboard is a UST log slice for this game → paste after pressed.
+  // Long-press in edit mode sets the replace range. In normal mode the
+  // LogDrawer handles long-press internally to enter multi-select; this
+  // handler only fires for the edit-mode flow.
   const onLongPress = (entryId: EventId) => {
     if (editActive) {
       const fromId = truncateCursor ?? entryId
       void actions.setEditRange(fromId, entryId)
+    }
+  }
+
+  // Paste lands at the truncate cursor if set, else after the most recent
+  // event. Reads the system clipboard on demand — no background probing, so
+  // the browser only prompts for permission when the user explicitly asks.
+  const onPaste = () => {
+    const lastId = visLog.length > 0 ? visLog[visLog.length - 1].id : null
+    const targetId = truncateCursor ?? lastId
+    if (targetId === null) {
+      actions.dismissNotification()
       return
     }
-    if (truncateCursor !== null) {
-      void actions.copySliceToClipboard(truncateCursor, entryId)
-      return
-    }
-    if (clipboardReady) {
-      void actions.pasteFromClipboard(entryId)
-      return
-    }
-    // Fall-through: solo long-press with empty clipboard = copy that single entry.
-    void actions.copySliceToClipboard(entryId, entryId)
+    void actions.pasteFromClipboard(targetId)
   }
 
   return (
@@ -265,11 +239,9 @@ export default function LiveEntry() {
       <Header
         teams={teams}
         score={state.score}
-        swapSides={swapSides}
         pickMode={pickMode}
         defendingShort={teams[otherTeam(state.possession)].short}
         onBack={actions.backToGameList}
-        onSwap={actions.toggleSwapSides}
         onCancelPickMode={actions.cancelPickMode}
       />
 
@@ -406,12 +378,13 @@ export default function LiveEntry() {
           expanded={logExpanded}
           truncateCursor={editActive ? null : truncateCursor}
           editRange={editRange}
-          clipboardReady={clipboardReady}
           editActive={editActive}
           onToggle={() => toggleDrawer('log')}
           onUndo={actions.undo}
           onSetCursor={actions.setTruncateCursor}
           onLongPress={onLongPress}
+          onCopySelection={actions.copyEventsToClipboard}
+          onPaste={onPaste}
         />
       </div>
     </div>

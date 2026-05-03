@@ -105,8 +105,9 @@ interface GameStore {
   dismissNotification: () => void
 
   // Copy / paste
-  copySliceToClipboard: (fromId: EventId, toId: EventId) => Promise<void>
-  pasteFromClipboard:   (afterEventId: EventId) => Promise<void>
+  copySliceToClipboard:  (fromId: EventId, toId: EventId) => Promise<void>
+  copyEventsToClipboard: (ids: EventId[]) => Promise<void>
+  pasteFromClipboard:    (afterEventId: EventId) => Promise<void>
 
   // Edit mode
   beginEdit:    () => void
@@ -721,6 +722,29 @@ export const useGameStore = create<GameStore>()(
         const env = buildEnvelope(session.gameConfig.id, slice)
         if (env.events.length === 0) {
           notify(set, 'failure', 'Nothing to copy', 'Range had no copyable events')
+          return
+        }
+        try {
+          await navigator.clipboard.writeText(serialize(env))
+        } catch {
+          notify(set, 'failure', 'Clipboard unavailable', 'Browser blocked clipboard write')
+          return
+        }
+        notify(set, 'success', `Copied ${env.events.length} events`, summariseEvents(env.events))
+      },
+
+      // ── copyEventsToClipboard ──────────────────────────────────────────────
+      // Pick the named ids out of session.rawLog (preserving log order) and
+      // write a UST envelope to the system clipboard. Selection may be
+      // non-contiguous; paste validation handles continuity at the destination.
+      async copyEventsToClipboard(ids) {
+        const { session } = get()
+        if (!session) return
+        const wanted = new Set(ids)
+        const slice = session.rawLog.filter(e => wanted.has(e.id))
+        const env = buildEnvelope(session.gameConfig.id, slice)
+        if (env.events.length === 0) {
+          notify(set, 'failure', 'Nothing to copy', 'Selection had no copyable events')
           return
         }
         try {

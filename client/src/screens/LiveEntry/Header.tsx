@@ -4,21 +4,19 @@ import { resolveContextLabel, type PickUiMode } from '@/core/pickModes'
 interface HeaderProps {
   teams: Record<TeamId, Team>
   score: Score
-  swapSides: boolean
   pickMode: PickUiMode | null
   defendingShort: string
   onBack: () => void
-  onSwap: () => void
   onCancelPickMode: () => void
 }
 
-// Top strip: back · score · swap. When pick mode is active, a second amber
-// strip appears below with the context label and a tap-to-cancel affordance.
+// Top strip: back · score. When pick mode is active, a second amber strip
+// appears below with the context label and a tap-to-cancel affordance.
 export function Header({
-  teams, score, swapSides, pickMode, defendingShort, onBack, onSwap, onCancelPickMode,
+  teams, score, pickMode, defendingShort, onBack, onCancelPickMode,
 }: HeaderProps) {
-  const teamLeft   = swapSides ? 'B' : 'A'
-  const teamCentre = swapSides ? 'A' : 'B'
+  const teamLeft   = 'A'
+  const teamCentre = 'B'
 
   return (
     <div className="flex-shrink-0 flex flex-col" style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -47,13 +45,7 @@ export function Header({
             {teams[teamCentre].name}
           </span>
         </div>
-        <button
-          onClick={onSwap}
-          className="text-muted hover:text-content transition-colors cursor-pointer text-base leading-none px-1"
-          title="Swap team sides"
-        >
-          ⇆
-        </button>
+        <span className="w-4" />
       </div>
 
       {pickMode && (
