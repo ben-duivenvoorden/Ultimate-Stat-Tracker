@@ -1,10 +1,6 @@
-import {
-  CHIP_H,
-  REPULSE_R, REPULSE_K, FRICTION, MIN_SPEED, BUFFER, CENTER_K,
-  BOUNDS_MARGIN_X, BOUNDS_MARGIN_Y,
-} from './constants'
+import { CHIP_H, SLOT_POSITIONS } from './constants'
 
-export interface Vec { x: number; y: number; vx: number; vy: number }
+export interface Vec { x: number; y: number }
 export interface Rect { l: number; r: number; t: number; b: number }
 export type ChipAlign = 'right-center' | 'left-center' | 'center-top' | 'center-bottom'
 export interface ChipSpec {
@@ -113,7 +109,6 @@ export function sampleBezier(
 // Axis-aligned rects covering the open pill + its chip footprints. Each
 // chip rect is padded by CHIP_RECT_PAD so other pills get pushed slightly
 // clear of the chip rather than just touching its edge.
-// Other pills are pushed out of these rects each frame.
 //
 // `halfHeight` is the pill's effective half-height (HH × pillScale). Chips
 // always use the constant CHIP_H — the chip set itself doesn't scale.
@@ -154,217 +149,11 @@ export function openZoneRects(
   return rects
 }
 
-// Place n pills around a fixed-radius ring centered on the canvas.
-// Radius factor controls the default spread — bigger = pills start (and,
-// with the weak spring, stay) further apart.
-export function initialPositions(n: number, w: number, h: number): Vec[] {
-  const cx = w / 2, cy = h / 2
-  const r = Math.min(w, h) * 0.46
-  return Array.from({ length: n }, (_, i) => {
-    const a = (i / n) * Math.PI * 2 - Math.PI / 2
-    return {
-      x: cx + Math.cos(a) * r,
-      y: cy + Math.sin(a) * r * 0.7,
-      vx: 0, vy: 0,
-    }
-  })
-}
-
-export interface PhysicsStepInput {
-  positions:  Vec[]
-  /** Per-pill half-width (px) — measured from the rendered DOM where
-   *  available, falling back to the heuristic. Drives both pairwise
-   *  repulsion strength and the hard non-overlap constraint. */
-  halfWidths: number[]
-  /** Effective pill half-height (HH × pillScale). Same for every pill. */
-  halfHeight: number
-  dt:         number
-  centre:     { x: number; y: number }
-  bounds:     { w: number; h: number }
-  drag:       number          // index being dragged, or -1
-  open:       number          // index opened, or -1
-  openChips:  ChipSpec[]      // chip layout for the open pill (empty if none)
-}
-
-// One physics tick. Mutates `positions` in place. Pure function of inputs:
-// no DOM, no module state, safe for unit tests.
-export function stepPhysics(input: PhysicsStepInput): void {
-  const { positions, halfWidths, halfHeight, dt, centre, bounds, drag, open, openChips } = input
-  const cx = centre.x, cy = centre.y
-  const { w, h } = bounds
-
-  // ─── Forces + integration ────────────────────────────────────────────────
-  for (let i = 0; i < positions.length; i++) {
-    if (i === drag || i === open) continue
-    const p = positions[i]
-
-    // Spring to centre
-    p.vx += (cx - p.x) * CENTER_K * dt
-    p.vy += (cy - p.y) * CENTER_K * dt
-
-    // AABB-aware pairwise repulsion. Strength scales with how close the
-    // rect-to-rect clearance is. Pills further apart than REPULSE_R clearance
-    // get nothing; touching (or overlapping) get the full push.
-    const hwI = halfWidths[i]
-    for (let j = 0; j < positions.length; j++) {
-      if (j === i) continue
-      const q = positions[j]
-      const dx = p.x - q.x
-      const dy = p.y - q.y
-      const adx = Math.abs(dx)
-      const ady = Math.abs(dy)
-      // Centre-to-centre minimum distances at which the rects would just touch.
-      const minDx = hwI + halfWidths[j]
-      const minDy = 2 * halfHeight
-      // Clearance (>=0 when rects don't overlap).
-      const cxClear = Math.max(0, adx - minDx)
-      const cyClear = Math.max(0, ady - minDy)
-      // Use Euclidean clearance as a single proximity scalar; if either axis
-      // overlaps we treat that axis's clearance as 0 (rects are interpenetrating
-      // along that axis), so the proximity is dominated by the other axis.
-      const proximity = Math.hypot(cxClear, cyClear)
-      if (proximity < REPULSE_R) {
-        const f = (REPULSE_R - proximity) / REPULSE_R
-        // Direction: from q toward p along their centre offset (use a small
-        // epsilon to avoid the zero-vector case).
-        const distC = Math.max(0.5, Math.hypot(dx, dy))
-        p.vx += (dx / distC) * f * REPULSE_K * dt
-        p.vy += (dy / distC) * f * REPULSE_K * dt
-      }
-    }
-
-    // Damping + jitter snap
-    p.vx *= FRICTION
-    p.vy *= FRICTION
-    if (Math.abs(p.vx) < MIN_SPEED) p.vx = 0
-    if (Math.abs(p.vy) < MIN_SPEED) p.vy = 0
-
-    // Integrate
-    p.x += p.vx * dt * 60
-    p.y += p.vy * dt * 60
-  }
-
-  // ─── Constraint resolution (iterative) ───────────────────────────────────
-  // Three constraints all need to hold every frame:
-  //   1. No two pills overlap (rects + BUFFER apart).
-  //   2. Every pill's footprint stays inside the canvas.
-  //   3. Other pills don't sit inside the open pill's chip zone.
-  // Each constraint pass can violate the others when pushing things around,
-  // so iterate a few times until they converge. This is a position-only
-  // (Gauss-Seidel-ish) projection; velocities are zeroed where appropriate
-  // so the spring doesn't fight the corrections next frame.
-  const ITER = 4
-  for (let iter = 0; iter < ITER; iter++) {
-    // (1) Pairwise non-overlap.
-    for (let i = 0; i < positions.length; i++) {
-      for (let j = i + 1; j < positions.length; j++) {
-        const a = positions[i]
-        const b = positions[j]
-        const dx = a.x - b.x
-        const dy = a.y - b.y
-        const minDx = halfWidths[i] + halfWidths[j] + BUFFER
-        const minDy = 2 * halfHeight + BUFFER
-        const ox = minDx - Math.abs(dx)
-        const oy = minDy - Math.abs(dy)
-        if (ox > 0 && oy > 0) {
-          const aLocked = i === drag
-          const bLocked = j === drag
-          if (ox < oy) {
-            const sgn = dx >= 0 ? 1 : -1
-            if (aLocked && !bLocked)      { b.x -= sgn * ox; b.vx = 0 }
-            else if (bLocked && !aLocked) { a.x += sgn * ox; a.vx = 0 }
-            else {
-              a.x += sgn * (ox / 2); a.vx = 0
-              b.x -= sgn * (ox / 2); b.vx = 0
-            }
-          } else {
-            const sgn = dy >= 0 ? 1 : -1
-            if (aLocked && !bLocked)      { b.y -= sgn * oy; b.vy = 0 }
-            else if (bLocked && !aLocked) { a.y += sgn * oy; a.vy = 0 }
-            else {
-              a.y += sgn * (oy / 2); a.vy = 0
-              b.y -= sgn * (oy / 2); b.vy = 0
-            }
-          }
-        }
-      }
-    }
-
-    // (2) Open-pill chip-zone push-out (other pills only).
-    // Uses a larger buffer than pair non-overlap so pills are clearly clear
-    // of the rendered chip — covers any heuristic mismatch in chipWidth and
-    // gives the chip's drop-shadow a bit of breathing room.
-    if (open >= 0 && openChips.length > 0) {
-      const o = positions[open]
-      const ohw = halfWidths[open]
-      const rects = openZoneRects(o.x, o.y, ohw, halfHeight, openChips)
-      const CHIP_BUFFER = 16
-      for (let i = 0; i < positions.length; i++) {
-        if (i === drag || i === open) continue
-        const p = positions[i]
-        const phw = halfWidths[i]
-        const pl = p.x - phw - CHIP_BUFFER, pr = p.x + phw + CHIP_BUFFER
-        const pt = p.y - halfHeight - CHIP_BUFFER, pb = p.y + halfHeight + CHIP_BUFFER
-        for (const rc of rects) {
-          const ox = Math.min(pr, rc.r) - Math.max(pl, rc.l)
-          const oy = Math.min(pb, rc.b) - Math.max(pt, rc.t)
-          if (ox > 0 && oy > 0) {
-            const rcx = (rc.l + rc.r) / 2
-            const rcy = (rc.t + rc.b) / 2
-            if (oy < ox) {
-              const sgn = p.y === rcy ? 1 : Math.sign(p.y - rcy)
-              p.y += sgn * oy
-              // Zero velocity heading back into the chip so the spring can't
-              // immediately drag the pill back through the chip next frame.
-              if (Math.sign(p.vy) !== sgn) p.vy = 0
-            } else {
-              const sgn = p.x === rcx ? 1 : Math.sign(p.x - rcx)
-              p.x += sgn * ox
-              if (Math.sign(p.vx) !== sgn) p.vx = 0
-            }
-          }
-        }
-      }
-    }
-
-    // (3) Visible-bounds clamp (pill + open chip footprint stay on canvas).
-    for (let i = 0; i < positions.length; i++) {
-      const p = positions[i]
-      const hw = halfWidths[i]
-      let minX = hw + BOUNDS_MARGIN_X
-      let maxX = w - hw - BOUNDS_MARGIN_X
-      let minY = halfHeight + BOUNDS_MARGIN_Y
-      let maxY = h - halfHeight - BOUNDS_MARGIN_Y
-
-      // While the open pill is being *dragged* we let it reach the edges
-      // freely — chips may overflow off-screen during the drag, but that's
-      // expected and snaps back when released. Otherwise expand the clamp
-      // to keep the chip footprint on-screen.
-      if (i === open && i !== drag && openChips.length > 0) {
-        const rects = openZoneRects(0, 0, hw, halfHeight, openChips)
-        let extLeft = hw, extRight = hw, extTop = halfHeight, extBottom = halfHeight
-        for (const r of rects) {
-          if (-r.l > extLeft)   extLeft   = -r.l
-          if ( r.r > extRight)  extRight  =  r.r
-          if (-r.t > extTop)    extTop    = -r.t
-          if ( r.b > extBottom) extBottom =  r.b
-        }
-        minX = extLeft + BOUNDS_MARGIN_X
-        maxX = w - extRight - BOUNDS_MARGIN_X
-        minY = extTop + BOUNDS_MARGIN_Y
-        maxY = h - extBottom - BOUNDS_MARGIN_Y
-      }
-
-      // Guard against negative ranges (canvas smaller than the footprint).
-      if (minX > maxX) minX = maxX = (minX + maxX) / 2
-      if (minY > maxY) minY = maxY = (minY + maxY) / 2
-
-      if (p.x < minX) { p.x = minX; if (p.vx < 0) p.vx = 0 }
-      if (p.x > maxX) { p.x = maxX; if (p.vx > 0) p.vx = 0 }
-      if (p.y < minY) { p.y = minY; if (p.vy < 0) p.vy = 0 }
-      if (p.y > maxY) { p.y = maxY; if (p.vy > 0) p.vy = 0 }
-    }
-  }
+// Pixel-space slot positions for the active line. Returns one Vec per slot in
+// SLOT_POSITIONS order (length always equals SLOT_POSITIONS.length, currently
+// 7). Callers index into it with the active-line index.
+export function slotPositions(bounds: { w: number; h: number }): Vec[] {
+  return SLOT_POSITIONS.map(s => ({ x: s.x * bounds.w, y: s.y * bounds.h }))
 }
 
 // Small wrapper used by Stage's drag handler — picks pointer xy from mouse / touch.

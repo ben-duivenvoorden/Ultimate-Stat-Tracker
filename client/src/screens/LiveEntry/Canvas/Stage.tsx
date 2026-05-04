@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { Player, PlayerId } from '@/core/types'
-import { TAP_THRESH, HH, PILL_SCALE_FACTORS, type PillSize } from './constants'
+import type { Player, PlayerId, TeamId } from '@/core/types'
+import { useGameStore } from '@/core/store'
+import { TAP_THRESH, HH, PILL_SCALE_FACTORS, SLOT_HIT_PADDING, type PillSize } from './constants'
 import {
-  initialPositions, pillHalfWidth, stepPhysics, eventXY, computeArrowPath,
+  pillHalfWidth, slotPositions, eventXY, computeArrowPath,
   type ChipSpec, type Vec,
 } from './physics'
 import { buildActions, chipAction, type ChipAction, type ChipId } from './layout'
@@ -13,9 +14,9 @@ import { PassArrowLayer, type PassArrowSpec, type ArrowNodeRefs } from './PassAr
 export type StageMode = 'in-play' | 'awaiting-pull' | 'pick'
 
 export interface StageProps {
-  /** Stable identifier for the rendered team — used as React key by parent so a
-   *  team swap unmounts/remounts the stage cleanly. */
-  teamId: string
+  /** Active team id. Used both as a stable key by the parent (a team swap
+   *  remounts the stage) and as the target of the swap-line-slots action. */
+  teamId: TeamId
   players: Player[]
   teamColor: string
 
@@ -33,7 +34,7 @@ export interface StageProps {
   bonusShown: boolean
 
   /** Per-device pill-size preference (sm / md / lg). Scales pill dimensions
-   *  and the physics half-height in lockstep. */
+   *  in lockstep with the slot hit-test half-height. */
   pillSize: PillSize
 
   /** Chip ids that should render dimmed + un-tappable (e.g. Goal / Receiver
@@ -43,7 +44,8 @@ export interface StageProps {
   /** Pass arrows to render on this stage; from/to indices match `players`. */
   arrows: PassArrowSpec[]
 
-  /** Logical canvas centre + bounds. Parent shifts cx if drawers are open. */
+  /** Logical canvas centre + bounds. Centre is informational only — slot
+   *  positions are derived from bounds via SLOT_POSITIONS. */
   centre: { x: number; y: number }
   bounds: { w: number; h: number }
 
@@ -63,16 +65,24 @@ export function Stage(props: StageProps) {
     nodeRefs.current = Array.from({ length: N }, () => null)
   }
 
-  // Per-pill measured half-width (px). Seeded with the heuristic so physics
-  // works on the first frame; PlayerNode replaces these via onMeasureWidth.
+  // Per-pill measured half-width (px). Seeded with the heuristic so the slot
+  // hit-test works on the first frame; PlayerNode replaces these via
+  // onMeasureWidth.
   const halfWidthsRef = useRef<number[]>([])
   if (halfWidthsRef.current.length !== N) {
     halfWidthsRef.current = props.players.map(p => pillHalfWidth(p.name))
   }
 
+  const swapLineSlots = useGameStore(s => s.swapLineSlots)
+
   // Initial positions on mount / when team-id changes (parent re-keys Stage).
+  // Positions snap to slot coords; halfWidths reseed off the new roster.
   useLayoutEffect(() => {
-    posRef.current = initialPositions(N, props.bounds.w, props.bounds.h)
+    const slots = slotPositions(props.bounds)
+    posRef.current = Array.from({ length: N }, (_, i) => ({
+      x: slots[i]?.x ?? props.bounds.w / 2,
+      y: slots[i]?.y ?? props.bounds.h / 2,
+    }))
     halfWidthsRef.current = props.players.map(p => pillHalfWidth(p.name))
     applyDOM()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -117,30 +127,21 @@ export function Stage(props: StageProps) {
     return buildActions(HW, { phase: 'in-play', stallShown: props.stallShown })
   }
 
-  // Chips for whichever pill is currently open — handed to physics so chip
-  // rects participate in push-out. Recomputed each render off the latest
-  // measured widths.
-  const openPlayer = openIdx >= 0 ? props.players[openIdx] : null
-  const openChips: ChipSpec[] = openPlayer ? chipsForPlayer(openPlayer) : []
-
   // Pill-size scale (per-device preference). Drives both the rendered pill
-  // dimensions in PlayerNode and the half-height passed to physics.
+  // dimensions in PlayerNode and the half-height used for slot hit-testing.
   const scale = PILL_SCALE_FACTORS[props.pillSize]
   const scaledHalfHeight = HH * scale
 
-  // Latest-props ref so the rAF loop sees current centre/bounds without restarting.
+  // Latest-props ref so the rAF loop sees current bounds/arrows without
+  // restarting.
   const tickCtx = useRef({
-    centre: props.centre,
     bounds: props.bounds,
     arrows: props.arrows,
-    openChips,
     halfHeight: scaledHalfHeight,
   })
   tickCtx.current = {
-    centre: props.centre,
     bounds: props.bounds,
     arrows: props.arrows,
-    openChips,
     halfHeight: scaledHalfHeight,
   }
 
@@ -156,50 +157,48 @@ export function Stage(props: StageProps) {
   // Arrow node refs — mutated each frame from the rAF tick.
   const arrowRefs = useRef<ArrowNodeRefs[]>([{ path: null, head: null }, { path: null, head: null }])
 
-  // rAF loop — runs once per Stage instance (per team).
+  // rAF loop — runs once per Stage instance (per team). Each frame, write the
+  // home-slot coords into posRef for every non-dragging pill, then update the
+  // pass arrows + DOM transforms. The dragged pill (if any) is positioned by
+  // the drag handler's onMove, not by this loop.
   useEffect(() => {
     let raf = 0
-    let last = performance.now()
-    const tick = (t: number) => {
-      const dt = Math.min(0.04, (t - last) / 1000)
-      last = t
+    const tick = () => {
       const ctx = tickCtx.current
-
-      stepPhysics({
-        positions:  posRef.current,
-        halfWidths: halfWidthsRef.current,
-        halfHeight: ctx.halfHeight,
-        dt,
-        centre:     ctx.centre,
-        bounds:     ctx.bounds,
-        drag:       stateRef.current.dragIdx,
-        open:       stateRef.current.openIdx,
-        openChips:  ctx.openChips,
-      })
+      const slots = slotPositions(ctx.bounds)
+      const drag = stateRef.current.dragIdx
+      const arr = posRef.current
+      for (let i = 0; i < arr.length; i++) {
+        if (i === drag) continue
+        const slot = slots[i]
+        if (!slot) continue
+        arr[i].x = slot.x
+        arr[i].y = slot.y
+      }
 
       // Update pass arrows (recent at slot 0, previous at slot 1).
       for (let k = 0; k < 2; k++) {
-        const slot = arrowRefs.current[k]
-        if (!slot?.path || !slot?.head) continue
+        const slotRef = arrowRefs.current[k]
+        if (!slotRef?.path || !slotRef?.head) continue
         const passIdx = ctx.arrows.length - 1 - k
         const pass = ctx.arrows[passIdx]
         if (!pass || pass.fromIdx < 0 || pass.toIdx < 0
-                  || pass.fromIdx >= posRef.current.length
-                  || pass.toIdx   >= posRef.current.length) {
-          slot.path.setAttribute('opacity', '0')
-          slot.head.setAttribute('opacity', '0')
+                  || pass.fromIdx >= arr.length
+                  || pass.toIdx   >= arr.length) {
+          slotRef.path.setAttribute('opacity', '0')
+          slotRef.head.setAttribute('opacity', '0')
           continue
         }
-        const a = posRef.current[pass.fromIdx]
-        const b = posRef.current[pass.toIdx]
+        const a = arr[pass.fromIdx]
+        const b = arr[pass.toIdx]
         if (!a || !b) continue
         const halfA = { hw: halfWidthsRef.current[pass.fromIdx], hh: ctx.halfHeight }
         const halfB = { hw: halfWidthsRef.current[pass.toIdx],   hh: ctx.halfHeight }
         const geom = computeArrowPath(a.x, a.y, b.x, b.y, halfA, halfB)
-        slot.path.setAttribute('d', geom.d)
-        slot.path.setAttribute('opacity', k === 0 ? '1' : '0.35')
-        slot.head.setAttribute('points', geom.head)
-        slot.head.setAttribute('opacity', k === 0 ? '1' : '0.35')
+        slotRef.path.setAttribute('d', geom.d)
+        slotRef.path.setAttribute('opacity', k === 0 ? '1' : '0.35')
+        slotRef.head.setAttribute('points', geom.head)
+        slotRef.head.setAttribute('opacity', k === 0 ? '1' : '0.35')
       }
 
       applyDOM()
@@ -232,7 +231,6 @@ export function Stage(props: StageProps) {
       const pp = posRef.current[idx]
       pp.x = m.x - dragInfo.current.offX
       pp.y = m.y - dragInfo.current.offY
-      pp.vx = 0; pp.vy = 0
       const el = nodeRefs.current[idx]
       if (el) el.style.transform = `translate3d(${pp.x}px, ${pp.y}px, 0)`
       ev.preventDefault?.()
@@ -240,9 +238,36 @@ export function Stage(props: StageProps) {
 
     const onEnd = () => {
       const wasDrag = dragInfo.current.moved
+      const draggedIdx = dragInfo.current.idx
       dragInfo.current.idx = -1
       setDragIdx(-1)
-      if (wasDrag) {
+
+      if (wasDrag && draggedIdx >= 0) {
+        // Hit-test the dragged pill's current centre against every other
+        // pill's slot rect. A drop within SLOT_HIT_PADDING of another slot
+        // counts as a swap; empty-space drops fall through and the pill
+        // snaps back to its slot via the next rAF tick.
+        const slots = slotPositions(tickCtx.current.bounds)
+        const halfH = tickCtx.current.halfHeight
+        const dragged = posRef.current[draggedIdx]
+        let target = -1
+        for (let j = 0; j < slots.length; j++) {
+          if (j === draggedIdx) continue
+          const slot = slots[j]
+          if (!slot) continue
+          const hw = halfWidthsRef.current[j] ?? pillHalfWidth(props.players[j]?.name ?? '')
+          const dx = Math.abs(dragged.x - slot.x)
+          const dy = Math.abs(dragged.y - slot.y)
+          if (dx <= hw + SLOT_HIT_PADDING && dy <= halfH + SLOT_HIT_PADDING) {
+            target = j
+            break
+          }
+        }
+
+        if (target >= 0) {
+          swapLineSlots(props.teamId, draggedIdx, target)
+        }
+
         // Swallow the synthetic click that follows mouseup so the drop site
         // doesn't immediately register as a tap. If no click fires (release
         // on a non-clickable area), tear the listener down on a short timer
@@ -253,26 +278,27 @@ export function Stage(props: StageProps) {
           removed = true
           document.removeEventListener('click', swallow, true)
         }
-        const swallow = (ev: Event) => {
-          ev.stopPropagation()
-          ev.preventDefault()
+        const swallow = (cev: Event) => {
+          cev.stopPropagation()
+          cev.preventDefault()
           cleanup()
         }
         document.addEventListener('click', swallow, true)
         setTimeout(cleanup, 200)
       }
+
       document.removeEventListener('mousemove',  onMove, true)
-      document.removeEventListener('mouseup',    onEnd,  true)
+      document.removeEventListener('mouseup',    onEnd as EventListener,  true)
       document.removeEventListener('touchmove',  onMove as EventListener, true)
-      document.removeEventListener('touchend',   onEnd,  true)
-      document.removeEventListener('touchcancel', onEnd, true)
+      document.removeEventListener('touchend',   onEnd as EventListener,  true)
+      document.removeEventListener('touchcancel', onEnd as EventListener, true)
     }
 
     document.addEventListener('mousemove', onMove, true)
-    document.addEventListener('mouseup',   onEnd,  true)
+    document.addEventListener('mouseup',   onEnd as EventListener,  true)
     document.addEventListener('touchmove', onMove as EventListener, { capture: true, passive: false })
-    document.addEventListener('touchend',  onEnd,  true)
-    document.addEventListener('touchcancel', onEnd, true)
+    document.addEventListener('touchend',  onEnd as EventListener,  true)
+    document.addEventListener('touchcancel', onEnd as EventListener, true)
   }
 
   // ─── Pill tap ───

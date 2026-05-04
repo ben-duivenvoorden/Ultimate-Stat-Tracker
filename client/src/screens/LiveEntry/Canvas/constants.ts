@@ -20,37 +20,8 @@ export const PILL_SIZE_CYCLE: Record<PillSize, PillSize> = {
 export const GAP = 6
 export const CHIP_H = 22
 
-// Physics. Tuned for an overdamped settle — pills approach equilibrium
-// without any oscillation / bounce-back. The reference values were
-// 2.6 / 150 / 1400 / 0.82.
-// No centre-spring — pills stay wherever they were last moved (by drag,
-// repulsion, or the chip-zone push-out). The bounds clamp + non-overlap
-// pass still keep them on-screen and apart; we just don't drag them back
-// toward the canvas centre.
-export const CENTER_K = 0
-// Soft repulsion only kicks in when pill-to-pill clearance is below
-// REPULSE_R px. Smaller = pills allowed to sit closer before pushing apart.
-export const REPULSE_R = 30
-export const REPULSE_K = 500
-// Friction here is the per-frame velocity multiplier (0 = stop instantly,
-// 1 = no damping). 0.65 means 35% of velocity decays each frame, which kills
-// any momentum within ~6 frames (≈100ms at 60fps).
-export const FRICTION = 0.65
 // Tap vs drag distinction (px). Bumped from 5 to forgive thumb shake.
 export const TAP_THRESH = 6
-// Velocities below this each frame snap to zero. With heavy friction the
-// snap rarely matters, but it eliminates any sub-pixel jitter at rest.
-export const MIN_SPEED = 1.5
-
-// Hard non-overlap minimum gap between two pill rects (px). Small value =
-// pills can cluster cozily without touching.
-export const BUFFER = 2
-export const ARROW_REPEL_NEAR = 32
-export const ARROW_REPEL_K = 900
-
-// Sweep animation
-export const SWEEP_DURATION_MS = 400
-export const SWEEP_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)'
 
 // Soft bounds inset — distance kept clear between the pill (or chip
 // footprint) and the canvas edge. Horizontal margin is tighter than
@@ -61,3 +32,26 @@ export const BOUNDS_MARGIN_Y = 15
 // Kept for API compatibility with anything still importing the original
 // uniform constant.
 export const BOUNDS_MARGIN = BOUNDS_MARGIN_Y
+
+// ─── Slot layout ──────────────────────────────────────────────────────────────
+// Seven home positions for the active line. Distribution-only (not tactical):
+// 4 corners (inset enough that a corner pill's chip rosette doesn't overflow
+// the canvas), 1 centred, 2 lower-middle. Coordinates are fractional 0..1 of
+// canvas bounds — see slotPositions() in physics.ts.
+//
+// Index order maps to the active line: players[i] sits at SLOT_POSITIONS[i].
+// Reordering happens via reorder-line events; positions themselves never move.
+export interface SlotFrac { readonly x: number; readonly y: number }
+export const SLOT_POSITIONS: ReadonlyArray<SlotFrac> = [
+  { x: 0.16, y: 0.18 }, // 0: top-left corner
+  { x: 0.84, y: 0.18 }, // 1: top-right corner
+  { x: 0.50, y: 0.45 }, // 2: centre
+  { x: 0.34, y: 0.68 }, // 3: lower-mid left
+  { x: 0.66, y: 0.68 }, // 4: lower-mid right
+  { x: 0.16, y: 0.86 }, // 5: bottom-left corner
+  { x: 0.84, y: 0.86 }, // 6: bottom-right corner
+]
+
+// Extra px around each pill's slot rect when hit-testing a drag release. A
+// release within this padding of another pill's slot counts as a swap.
+export const SLOT_HIT_PADDING = 8

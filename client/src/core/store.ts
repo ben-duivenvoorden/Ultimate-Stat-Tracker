@@ -71,6 +71,7 @@ interface GameStore {
   nextPoint:         () => void
   backToGameList:    () => void
   reorderActiveLine: (teamId: TeamId, fromIdx: number, toIdx: number) => void
+  swapLineSlots:     (teamId: TeamId, i: number, j: number) => void
 
   // Recording actions (all funnel through canRecord guards)
   tapPlayer:            (player: Player) => void
@@ -601,6 +602,22 @@ export const useGameStore = create<GameStore>()(
           if (fromIdx < 0 || fromIdx >= current.length || toIdx < 0 || toIdx >= current.length) return null
           const [moved] = current.splice(fromIdx, 1)
           current.splice(toIdx, 0, moved)
+          return [{ pointIndex: state.pointIndex, type: 'reorder-line', teamId, line: current }]
+        })
+      },
+
+      // ── swapLineSlots ────────────────────────────────────────────────────────
+      // Swap two players' positions in a team's on-field line. Used by the
+      // canvas drag-onto-pill interaction. Single 'reorder-line' event so the
+      // swap is one undo step.
+      swapLineSlots(teamId, i, j) {
+        if (i === j) return
+        recordVia(get, set, state => {
+          const current = state.activeLine[teamId].map(p => p.id)
+          if (i < 0 || i >= current.length || j < 0 || j >= current.length) return null
+          const tmp = current[i]
+          current[i] = current[j]
+          current[j] = tmp
           return [{ pointIndex: state.pointIndex, type: 'reorder-line', teamId, line: current }]
         })
       },
