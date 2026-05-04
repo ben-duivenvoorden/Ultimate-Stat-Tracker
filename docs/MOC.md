@@ -40,6 +40,16 @@
 
 ---
 
+## Plans
+
+| Document | What it answers |
+|---|---|
+| [slot-canvas-and-team-management.md](plans/slot-canvas-and-team-management.md) | Slot-based canvas (7 home positions, drag-to-swap) + append-only logs for games/teams |
+
+Approved plans are committed here as `<descriptive-slug>.md` before implementation.
+
+---
+
 ## Research
 
 | Document | What it answers |
