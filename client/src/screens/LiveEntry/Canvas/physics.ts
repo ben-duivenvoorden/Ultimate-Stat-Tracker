@@ -34,6 +34,9 @@ export const pillHalfWidth = (name: string): number =>
 
 // Extra padding added to each chip rect when computing the open zone, so
 // other pills get pushed a little clear of the chip rather than touching it.
+// Applied only to the openZoneRects view; chipRect() returns the rendered
+// chip's true bbox so overlap checks in the layout repair pass aren't
+// distorted by the push-out cushion.
 const CHIP_RECT_PAD = 6
 
 export function rectExitDist(ux: number, uy: number, hw: number, hh: number): number {
@@ -106,9 +109,44 @@ export function sampleBezier(
   return out
 }
 
+// Axis-aligned pill rect at canvas-space centre (cx, cy) with the given
+// half-width / half-height (which already account for pillScale).
+export function pillRect(cx: number, cy: number, HW: number, halfHeight: number): Rect {
+  return { l: cx - HW, r: cx + HW, t: cy - halfHeight, b: cy + halfHeight }
+}
+
+// Axis-aligned rect for a single chip's *rendered* bbox — i.e. the actual
+// pixels the chip occupies, with no extra padding. Used by the layout
+// repair pass so the bounds and overlap checks reflect what the user sees,
+// not a softened cushion.
+//
+// `cx, cy` is the host pill's canvas-space centre — `chip.ax/ay` are
+// pill-local offsets, so the chip's anchor sits at (cx + ax, cy + ay).
+export function chipRect(cx: number, cy: number, chip: ChipSpec): Rect {
+  const cw = chipWidth(chip.label)
+  const acx = cx + chip.ax, acy = cy + chip.ay
+  let l: number, r: number, t: number, b: number
+  if (chip.align === 'right-center') {
+    r = acx; l = acx - cw
+    t = acy - CHIP_H / 2; b = acy + CHIP_H / 2
+  } else if (chip.align === 'left-center') {
+    l = acx; r = acx + cw
+    t = acy - CHIP_H / 2; b = acy + CHIP_H / 2
+  } else if (chip.align === 'center-top') {
+    l = acx - cw / 2; r = acx + cw / 2
+    t = acy; b = acy + CHIP_H
+  } else {
+    // center-bottom: chip's bottom edge touches anchor → extends upward
+    l = acx - cw / 2; r = acx + cw / 2
+    t = acy - CHIP_H; b = acy
+  }
+  return { l, r, t, b }
+}
+
 // Axis-aligned rects covering the open pill + its chip footprints. Each
 // chip rect is padded by CHIP_RECT_PAD so other pills get pushed slightly
-// clear of the chip rather than just touching its edge.
+// clear of the chip rather than just touching its edge — used by the
+// (currently dormant) push-out physics, NOT by the layout repair pass.
 //
 // `halfHeight` is the pill's effective half-height (HH × pillScale). Chips
 // always use the constant CHIP_H — the chip set itself doesn't scale.
@@ -117,36 +155,37 @@ export function openZoneRects(
   HW: number, halfHeight: number,
   chips: ChipSpec[],
 ): Rect[] {
-  const rects: Rect[] = []
-  rects.push({ l: cx - HW, r: cx + HW, t: cy - halfHeight, b: cy + halfHeight })
+  const rects: Rect[] = [pillRect(cx, cy, HW, halfHeight)]
   for (const a of chips) {
-    const cw = chipWidth(a.label)
-    const acx = cx + a.ax, acy = cy + a.ay
-    let l: number, r: number, t: number, b: number
-    if (a.align === 'right-center') {
-      r = acx; l = acx - cw
-      t = acy - CHIP_H / 2; b = acy + CHIP_H / 2
-    } else if (a.align === 'left-center') {
-      l = acx; r = acx + cw
-      t = acy - CHIP_H / 2; b = acy + CHIP_H / 2
-    } else if (a.align === 'center-top') {
-      l = acx - cw / 2; r = acx + cw / 2
-      t = acy; b = acy + CHIP_H
-    } else {
-      // center-bottom: chip's bottom edge touches anchor → extends upward
-      l = acx - cw / 2; r = acx + cw / 2
-      t = acy - CHIP_H; b = acy
-    }
-    // Pad outward so the push-out clears the chip's rendered border + a touch
-    // of breathing room.
+    const r = chipRect(cx, cy, a)
     rects.push({
-      l: l - CHIP_RECT_PAD,
-      r: r + CHIP_RECT_PAD,
-      t: t - CHIP_RECT_PAD,
-      b: b + CHIP_RECT_PAD,
+      l: r.l - CHIP_RECT_PAD,
+      r: r.r + CHIP_RECT_PAD,
+      t: r.t - CHIP_RECT_PAD,
+      b: r.b + CHIP_RECT_PAD,
     })
   }
   return rects
+}
+
+// Standard AABB intersection test on rects expressed as { l, r, t, b }.
+export function rectsIntersect(a: Rect, b: Rect): boolean {
+  return a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t
+}
+
+// True when `r` sits fully inside the canvas bounds with the given soft
+// inset margins. Used during the chip-placement repair pass to reject
+// candidate anchors that would push a chip past the canvas edge.
+export function rectInsideBounds(
+  r: Rect,
+  bounds: { w: number; h: number },
+  marginX: number,
+  marginY: number,
+): boolean {
+  return r.l >= marginX
+      && r.r <= bounds.w - marginX
+      && r.t >= marginY
+      && r.b <= bounds.h - marginY
 }
 
 // Pixel-space slot positions for the active line. Returns one Vec per slot in

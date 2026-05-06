@@ -1,10 +1,13 @@
-import { HH } from './constants'
-import { rectExitDist, type ChipSpec, type ChipAlign } from './physics'
+import { BOUNDS_MARGIN_X, BOUNDS_MARGIN_Y, HH } from './constants'
+import {
+  rectExitDist, chipRect, rectsIntersect, rectInsideBounds,
+  type ChipSpec, type ChipAlign, type Rect,
+} from './physics'
 
 // Chip identifiers and their on-screen labels.
-// The chips use the same long defence-action names as the event log so the
-// recorder sees a single, consistent vocabulary. core/format.ts defines the
-// matching log strings.
+// The chips use the same defence-action names as the event log (with the
+// word "Defence" elided to "…" so the wide pills don't dominate the
+// rosette). core/format.ts keeps the long form for the event-log copy.
 export const CHIP_LABELS = {
   pull:         'Pull',
   'pull-bonus': 'Pull Distance Bonus',
@@ -13,8 +16,8 @@ export const CHIP_LABELS = {
   goal:         'Goal',
   tw:           'Throwaway',
   st:           'Stall',
-  blk:          'Blocked by Defence',
-  int:          'Intercepted by Defence',
+  blk:          'Blocked by …',
+  int:          'Intercepted by …',
 } as const
 
 export type ChipId = keyof typeof CHIP_LABELS
@@ -29,14 +32,28 @@ export interface BuildOpts {
   bonusShown?: boolean
 }
 
+/** Per-pill placement context. When provided, `buildActions` orients the
+ *  rosette toward the canvas interior (180° hemisphere centred on the
+ *  pill's "open direction") and runs a repair pass that nudges any chip
+ *  whose footprint clips the canvas bounds, overlaps another pill's slot
+ *  rect, or overlaps a previously-placed chip in the same rosette. */
+export interface Placement {
+  /** Pill centre in canvas px. */
+  pill:   { x: number; y: number }
+  /** Logical canvas bounds (Stage's `bounds` prop). */
+  bounds: { w: number; h: number }
+  /** Other pills' rectangles in canvas px (excluding the open pill). */
+  others: Rect[]
+}
+
 // Base visible gap (px) between the chip's nearest edge and the pill
 // perimeter, measured along the ray from pill centre. Applied at axial
 // directions (top / right / bottom / left).
 const CHIP_GAP = 12
 // Extra outward push applied to chips on diagonals (~45°) so their long
-// labels (e.g. "Blocked by Defence") don't crash into the axial chips that
-// flank them (Throwaway above, Intercepted by Defence to the right).
-// Scales with how diagonal the angle is — zero at axes, maximum at 45°.
+// labels (e.g. "Blocked by …") don't crash into the axial chips that
+// flank them. Scales with how diagonal the angle is — zero at axes,
+// maximum at 45°.
 const CHIP_CORNER_BUMP = 28
 
 // Anchor a chip on the pill's rectangular perimeter (extended by CHIP_GAP +
@@ -54,7 +71,7 @@ function rayAnchor(id: ChipId, angle: number, HW: number): ChipSpec {
   const ay = sinA * t
   // Strict `>` so 45° angles fall through to horizontal alignment, avoiding
   // a long chip (extending vertically with center-bottom) overlapping the
-  // axial Throwaway chip above.
+  // axial chip above.
   let align: ChipAlign
   if (Math.abs(sinA) > Math.abs(cosA)) {
     align = sinA < 0 ? 'center-bottom' : 'center-top'
@@ -64,48 +81,148 @@ function rayAnchor(id: ChipId, angle: number, HW: number): ChipSpec {
   return { id, label: CHIP_LABELS[id], ax, ay, align, connectorLength }
 }
 
+// ─── Adaptive orientation ─────────────────────────────────────────────────
+// "Open direction" — the cardinal direction (right / left / down / up) that
+// points away from the pill's nearest canvas edge. Used as the centre of a
+// 180° rosette so chips fan into the available canvas space rather than off
+// the edge.
+//
+// Returns null for pills sitting roughly in the canvas centre — those keep
+// the legacy 360° layout (Rec left, Goal bottom, arc top→right) so existing
+// muscle memory stays intact for the most common in-play position.
+const CENTRE_DEAD_ZONE = 0.15
+// Horizontal bias: chips are wider than tall, so steering away from a
+// horizontal canvas edge gains more clearance than steering away from a
+// vertical one. The ×1.2 makes |fx| win narrow ties (e.g. fractional slots
+// like 0.16,0.18 where |dx| ≈ |dy|).
+const HORIZONTAL_BIAS = 1.2
+
+function openDirection(p: Placement): number | null {
+  const fx = p.pill.x / p.bounds.w - 0.5
+  const fy = p.pill.y / p.bounds.h - 0.5
+  if (Math.abs(fx) < CENTRE_DEAD_ZONE && Math.abs(fy) < CENTRE_DEAD_ZONE) return null
+  if (Math.abs(fx) * HORIZONTAL_BIAS >= Math.abs(fy)) return fx < 0 ? 0 : Math.PI
+  return fy < 0 ? Math.PI / 2 : -Math.PI / 2
+}
+
+// Ordering of chips along the 180° arc, from arc-start (θ₀ - π/2) to
+// arc-end (θ₀ + π/2). Chosen to keep a "turnover types → score → defence"
+// reading order: rec, tw, [st], goal, blk, int.
+const ARC_ORDER_INPLAY_NO_STALL: ChipId[] = ['rec', 'tw', 'goal', 'blk', 'int']
+const ARC_ORDER_INPLAY_STALL:    ChipId[] = ['rec', 'tw', 'st', 'goal', 'blk', 'int']
+const ARC_ORDER_PULL_NO_BONUS:   ChipId[] = ['brick', 'pull']
+const ARC_ORDER_PULL_BONUS:      ChipId[] = ['brick', 'pull', 'pull-bonus']
+
+// Evenly spread `ids` across the 180° arc centred at θ₀.
+function hemisphereProposals(ids: ChipId[], theta0: number): { id: ChipId; angle: number }[] {
+  const N = ids.length
+  return ids.map((id, i) => {
+    const t = N === 1 ? 0.5 : i / (N - 1)
+    return { id, angle: (theta0 - Math.PI / 2) + t * Math.PI }
+  })
+}
+
+// Legacy 360° layout — preserved for centre-of-canvas pills so the rosette
+// still reads top→right with Rec on the left and Goal at the bottom.
+function legacyProposals(opts: BuildOpts): { id: ChipId; angle: number }[] {
+  if (opts.phase === 'awaiting-pull') {
+    const out: { id: ChipId; angle: number }[] = [
+      { id: 'pull',  angle: -Math.PI / 2 },
+      { id: 'brick', angle:  Math.PI },
+    ]
+    if (opts.bonusShown) out.push({ id: 'pull-bonus', angle: 0 })
+    return out
+  }
+  const arc: ChipId[] = opts.stallShown ? ['tw', 'st', 'blk', 'int'] : ['tw', 'blk', 'int']
+  const N = arc.length
+  const arcProps = arc.map((id, i) => ({
+    id, angle: -Math.PI / 2 + (i / (N - 1)) * (Math.PI / 2),
+  }))
+  return [
+    { id: 'rec'  as ChipId, angle: Math.PI },
+    { id: 'goal' as ChipId, angle: Math.PI / 2 },
+    ...arcProps,
+  ]
+}
+
+// Repair pass — sweep ±150° around `angle` in 15° steps to find a placement
+// where the chip rect fits inside bounds, doesn't overlap any other-pill
+// rect, and doesn't overlap a previously-accepted chip rect.
+//
+// The sweep deliberately ranges almost a full revolution: when the proposed
+// half of the pill is so cramped that no nearby angle fits (e.g. wide
+// "Receiver Error" chip on a left-edge pill), the chip jumps to a quadrant
+// that has room. Falls back to the proposed angle when no candidate clears
+// all three constraints — degraded but functional rendering.
+const REPAIR_STEP_DEG = 15
+const REPAIR_MAX_DEG  = 150
+
+function repairChip(
+  id: ChipId, angle: number, HW: number, halfHeight: number,
+  p: Placement, accepted: Rect[],
+): ChipSpec {
+  const candidates: number[] = [0]
+  for (let s = REPAIR_STEP_DEG; s <= REPAIR_MAX_DEG; s += REPAIR_STEP_DEG) {
+    candidates.push((s * Math.PI) / 180, -(s * Math.PI) / 180)
+  }
+  let fallback: ChipSpec | null = null
+  for (const da of candidates) {
+    const a = angle + da
+    const candidate = rayAnchor(id, a, HW)
+    const r = chipRect(p.pill.x, p.pill.y, candidate)
+    const inside = rectInsideBounds(r, p.bounds, BOUNDS_MARGIN_X, BOUNDS_MARGIN_Y)
+    const hitsOther    = p.others.some(o => rectsIntersect(o, r))
+    const hitsAccepted = accepted.some(a2 => rectsIntersect(a2, r))
+    if (inside && !hitsOther && !hitsAccepted) return candidate
+    if (!fallback && da === 0) fallback = candidate
+  }
+  // halfHeight kept in the signature for future use (e.g. clamp-against-pill);
+  // currently only `chipRect` width-pad matters. Reference here so the
+  // parameter is non-vestigial when callers wire scaled pill height through.
+  void halfHeight
+  return fallback ?? rayAnchor(id, angle, HW)
+}
+
 // Layout for the chips that surround an opened pill.
 //
-// In-play (5 chips today; 6 when stallShown):
-//   - Receiver Error: left
-//   - Goal:           bottom
-//   - Throwaway / [Stall] / Block / Intercept span the top→right
-//     quarter-arc evenly. Stall sits between Throwaway and Block when shown.
-//
-// Awaiting-pull:
-//   - Pull:                top (always)
-//   - Pull Distance Bonus: right (when bonusShown)
-//
-// All chips use a single rectangular-perimeter formula with CHIP_GAP
-// clearance so they sit at a uniform visible distance from the pill.
-export function buildActions(HW: number, opts: BuildOpts): ChipSpec[] {
-  if (opts.phase === 'awaiting-pull') {
-    // Pull at top, Brick on the left, Pull Distance Bonus on the right
-    // (when shown). Three axial positions keep each chip on its own side,
-    // which scales cleanly whether or not the bonus is enabled.
-    const chips: ChipSpec[] = [
-      rayAnchor('pull',  -Math.PI / 2, HW),
-      rayAnchor('brick',  Math.PI,     HW),
-    ]
-    if (opts.bonusShown) chips.push(rayAnchor('pull-bonus', 0, HW))
-    return chips
+// Two layout modes:
+//   • Adaptive (when `placement` is given AND the pill is near a canvas
+//     edge): chips are laid on a 180° arc oriented away from the nearest
+//     edge, then any chip that still clips bounds or another pill is nudged
+//     by the repair sweep.
+//   • Legacy (centre-of-canvas pills, or callers that don't pass
+//     `placement`): Rec left, Goal bottom, arc top→right — same layout the
+//     rosette has had since the canvas was introduced.
+export function buildActions(HW: number, opts: BuildOpts, placement?: Placement): ChipSpec[] {
+  const theta0 = placement ? openDirection(placement) : null
+
+  // Pick proposals: hemisphere-oriented when adaptive, legacy otherwise.
+  let proposals: { id: ChipId; angle: number }[]
+  if (theta0 !== null) {
+    let ids: ChipId[]
+    if (opts.phase === 'awaiting-pull') {
+      ids = opts.bonusShown ? ARC_ORDER_PULL_BONUS : ARC_ORDER_PULL_NO_BONUS
+    } else {
+      ids = opts.stallShown ? ARC_ORDER_INPLAY_STALL : ARC_ORDER_INPLAY_NO_STALL
+    }
+    proposals = hemisphereProposals(ids, theta0)
+  } else {
+    proposals = legacyProposals(opts)
   }
 
-  // Quarter-arc chips: top→right. 4-step (with stall) or 3-step.
-  const arc: ChipId[] = opts.stallShown
-    ? ['tw', 'st', 'blk', 'int']
-    : ['tw', 'blk', 'int']
-  const N = arc.length
-  const arcChips = arc.map((id, i) => {
-    const angle = -Math.PI / 2 + (i / (N - 1)) * (Math.PI / 2)
-    return rayAnchor(id, angle, HW)
-  })
+  // No placement context — emit raw proposals (used by tests / static callers).
+  if (!placement) return proposals.map(({ id, angle }) => rayAnchor(id, angle, HW))
 
-  return [
-    rayAnchor('rec',  Math.PI,    HW),
-    rayAnchor('goal', Math.PI / 2, HW),
-    ...arcChips,
-  ]
+  // With placement context, run the repair pass on every chip so even the
+  // legacy layout gets edge / overlap relief at narrow canvas widths.
+  const accepted: Rect[] = []
+  const out: ChipSpec[] = []
+  for (const { id, angle } of proposals) {
+    const repaired = repairChip(id, angle, HW, HH, placement, accepted)
+    out.push(repaired)
+    accepted.push(chipRect(placement.pill.x, placement.pill.y, repaired))
+  }
+  return out
 }
 
 // Map a ChipId to the engine action that should run when the chip is tapped.

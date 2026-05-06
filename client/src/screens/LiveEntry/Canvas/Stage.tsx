@@ -3,10 +3,10 @@ import type { Player, PlayerId, TeamId } from '@/core/types'
 import { useGameStore } from '@/core/store'
 import { TAP_THRESH, HH, PILL_SCALE_FACTORS, SLOT_HIT_PADDING, type PillSize } from './constants'
 import {
-  pillHalfWidth, slotPositions, eventXY, computeArrowPath,
-  type ChipSpec, type Vec,
+  pillHalfWidth, pillRect, slotPositions, eventXY, computeArrowPath,
+  type ChipSpec, type Rect, type Vec,
 } from './physics'
-import { buildActions, chipAction, type ChipAction, type ChipId } from './layout'
+import { buildActions, chipAction, type ChipAction, type ChipId, type Placement } from './layout'
 type DisabledChipIds = ReadonlySet<ChipId>
 import { PlayerNode } from './PlayerNode'
 import { PassArrowLayer, type PassArrowSpec, type ArrowNodeRefs } from './PassArrowLayer'
@@ -112,6 +112,31 @@ export function Stage(props: StageProps) {
 
   const dragInfo = useRef({ idx: -1, offX: 0, offY: 0, startX: 0, startY: 0, moved: false })
 
+  // Pill-size scale (per-device preference). Drives both the rendered pill
+  // dimensions in PlayerNode and the half-height used for slot hit-testing.
+  const scale = PILL_SCALE_FACTORS[props.pillSize]
+  const scaledHalfHeight = HH * scale
+
+  // Build a Placement for the pill at active-line index `idx`. Anchors the
+  // chip rosette at the pill's slot (not its drag-offset position) and
+  // exposes every *other* pill's slot rect so the repair pass in
+  // buildActions() can keep chips clear of teammates.
+  const placementFor = (idx: number): Placement | undefined => {
+    if (idx < 0) return undefined
+    const slots = slotPositions(props.bounds)
+    const slot = slots[idx]
+    if (!slot) return undefined
+    const others: Rect[] = []
+    for (let j = 0; j < props.players.length; j++) {
+      if (j === idx) continue
+      const s = slots[j]
+      if (!s) continue
+      const hw = halfWidthsRef.current[j] ?? pillHalfWidth(props.players[j]?.name ?? '')
+      others.push(pillRect(s.x, s.y, hw, scaledHalfHeight))
+    }
+    return { pill: { x: slot.x, y: slot.y }, bounds: props.bounds, others }
+  }
+
   // Compute the chip set per pill. Always non-empty for pills that *could*
   // be opened (holder in in-play, puller in awaiting-pull) so the chips are
   // already mounted (invisible) and can transition in when isOpen flips.
@@ -119,18 +144,14 @@ export function Stage(props: StageProps) {
     if (props.mode === 'pick') return []
     const idx = props.players.indexOf(player)
     const HW = idx >= 0 ? halfWidthsRef.current[idx] : pillHalfWidth(player.name)
+    const placement = placementFor(idx)
     if (props.mode === 'awaiting-pull') {
       if (player.id !== props.pullerId) return []
-      return buildActions(HW, { phase: 'awaiting-pull', bonusShown: props.bonusShown })
+      return buildActions(HW, { phase: 'awaiting-pull', bonusShown: props.bonusShown }, placement)
     }
     if (player.id !== props.holderId) return []
-    return buildActions(HW, { phase: 'in-play', stallShown: props.stallShown })
+    return buildActions(HW, { phase: 'in-play', stallShown: props.stallShown }, placement)
   }
-
-  // Pill-size scale (per-device preference). Drives both the rendered pill
-  // dimensions in PlayerNode and the half-height used for slot hit-testing.
-  const scale = PILL_SCALE_FACTORS[props.pillSize]
-  const scaledHalfHeight = HH * scale
 
   // Latest-props ref so the rAF loop sees current bounds/arrows without
   // restarting.
