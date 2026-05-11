@@ -145,24 +145,33 @@ function legacyProposals(opts: BuildOpts): { id: ChipId; angle: number }[] {
   ]
 }
 
-// Repair pass — sweep ±150° around `angle` in 15° steps looking for a chip
-// placement that satisfies as many of these constraints as possible:
-//   1. (HARD)  doesn't overlap a previously-accepted chip rect
-//   2. (SOFT)  fits inside the canvas bounds
-//   3. (SOFT)  doesn't overlap another pill's slot rect
+// Repair pass — sweep ±180° around `angle` in 10° steps looking for the
+// best chip placement against four tiered constraints:
 //
-// Chip-chip overlap is treated as a hard constraint: two chips on top of
-// each other become unreadable. A chip clipping the bounds, or sitting on
-// top of a teammate pill, is recoverable — the bounds inset is generous and
-// the per-frame pill push-out in Stage.tsx evicts overlapping pills.
+//   tier 0 (perfect): chip-chip clear, in bounds, no pill overlap
+//   tier 1:           chip-chip clear, in bounds (may overlap a pill — the
+//                                                  per-frame push-out in
+//                                                  Stage.tsx evicts the pill)
+//   tier 2:           chip-chip clear (may clip bounds — pick the least
+//                                                  clipped placement)
+//   tier 3 (degraded): chip-chip overlap allowed (true last resort)
 //
-// Tier ordering (best → worst):
-//   tier 0: all soft constraints satisfied (and no chip-chip overlap)
-//   tier 1: chip-chip clear, may clip bounds OR overlap a pill
-//   tier 2: chip-chip overlap (true degraded fallback)
-// Within each tier, smaller |da| (closer to the proposed angle) wins.
-const REPAIR_STEP_DEG = 15
-const REPAIR_MAX_DEG  = 150
+// Bounds violations are promoted above pill overlap because a chip past the
+// canvas edge is unfixable — there's nothing the push-out pass can do.
+// Pill-vs-chip overlap is recoverable by displacing the pill, so it ranks
+// below clipping in the search.
+//
+// 36 candidate angles (1 + 18 + 18) is dense enough that a chip-chip-clear
+// placement almost always exists.
+const REPAIR_STEP_DEG = 10
+const REPAIR_MAX_DEG  = 180
+
+function outsideAmount(r: Rect, bounds: { w: number; h: number }, mx: number, my: number): number {
+  return Math.max(0, mx - r.l)
+       + Math.max(0, r.r - (bounds.w - mx))
+       + Math.max(0, my - r.t)
+       + Math.max(0, r.b - (bounds.h - my))
+}
 
 function repairChip(
   id: ChipId, angle: number, HW: number, halfHeight: number,
@@ -173,34 +182,44 @@ function repairChip(
     candidates.push((s * Math.PI) / 180, -(s * Math.PI) / 180)
   }
 
-  let bestPerfect:    { spec: ChipSpec; absDa: number } | null = null
-  let bestNoChipChip: { spec: ChipSpec; absDa: number; softHits: number } | null = null
-  let bestAny:        { spec: ChipSpec; absDa: number; chipHits: number; softHits: number } | null = null
+  let bestT0: { spec: ChipSpec; absDa: number } | null = null
+  let bestT1: { spec: ChipSpec; absDa: number; pillHits: number } | null = null
+  let bestT2: { spec: ChipSpec; absDa: number; outsideAmt: number; pillHits: number } | null = null
+  let bestT3: { spec: ChipSpec; absDa: number; chipHits: number; outsideAmt: number; pillHits: number } | null = null
 
   for (const da of candidates) {
-    const candidate = rayAnchor(id, angle + da, HW)
-    const r = chipRect(p.pill.x, p.pill.y, candidate)
-    const inside       = rectInsideBounds(r, p.bounds, BOUNDS_MARGIN_X, BOUNDS_MARGIN_Y)
-    const hitsOther    = p.others.some(o => rectsIntersect(o, r))
-    const hitsAccepted = accepted.reduce((n, a2) => n + (rectsIntersect(a2, r) ? 1 : 0), 0)
-    const softHits     = (inside ? 0 : 1) + (hitsOther ? 1 : 0)
-    const absDa        = Math.abs(da)
+    const candidate  = rayAnchor(id, angle + da, HW)
+    const r          = chipRect(p.pill.x, p.pill.y, candidate)
+    const inside     = rectInsideBounds(r, p.bounds, BOUNDS_MARGIN_X, BOUNDS_MARGIN_Y)
+    const outsideAmt = inside ? 0 : outsideAmount(r, p.bounds, BOUNDS_MARGIN_X, BOUNDS_MARGIN_Y)
+    const pillHits   = p.others.reduce((n, o)  => n + (rectsIntersect(o,  r) ? 1 : 0), 0)
+    const chipHits   = accepted.reduce((n, a2) => n + (rectsIntersect(a2, r) ? 1 : 0), 0)
+    const absDa      = Math.abs(da)
 
-    if (hitsAccepted === 0 && softHits === 0) {
-      if (!bestPerfect || absDa < bestPerfect.absDa) bestPerfect = { spec: candidate, absDa }
+    if (chipHits === 0 && inside && pillHits === 0) {
+      if (!bestT0 || absDa < bestT0.absDa) bestT0 = { spec: candidate, absDa }
     }
-    if (hitsAccepted === 0) {
-      if (!bestNoChipChip
-          || softHits < bestNoChipChip.softHits
-          || (softHits === bestNoChipChip.softHits && absDa < bestNoChipChip.absDa)) {
-        bestNoChipChip = { spec: candidate, absDa, softHits }
+    if (chipHits === 0 && inside) {
+      if (!bestT1
+          || pillHits < bestT1.pillHits
+          || (pillHits === bestT1.pillHits && absDa < bestT1.absDa)) {
+        bestT1 = { spec: candidate, absDa, pillHits }
       }
     }
-    if (!bestAny
-        || hitsAccepted < bestAny.chipHits
-        || (hitsAccepted === bestAny.chipHits && softHits < bestAny.softHits)
-        || (hitsAccepted === bestAny.chipHits && softHits === bestAny.softHits && absDa < bestAny.absDa)) {
-      bestAny = { spec: candidate, absDa, chipHits: hitsAccepted, softHits }
+    if (chipHits === 0) {
+      if (!bestT2
+          || outsideAmt < bestT2.outsideAmt
+          || (outsideAmt === bestT2.outsideAmt && pillHits < bestT2.pillHits)
+          || (outsideAmt === bestT2.outsideAmt && pillHits === bestT2.pillHits && absDa < bestT2.absDa)) {
+        bestT2 = { spec: candidate, absDa, outsideAmt, pillHits }
+      }
+    }
+    if (!bestT3
+        || chipHits   < bestT3.chipHits
+        || (chipHits === bestT3.chipHits && outsideAmt < bestT3.outsideAmt)
+        || (chipHits === bestT3.chipHits && outsideAmt === bestT3.outsideAmt && pillHits < bestT3.pillHits)
+        || (chipHits === bestT3.chipHits && outsideAmt === bestT3.outsideAmt && pillHits === bestT3.pillHits && absDa < bestT3.absDa)) {
+      bestT3 = { spec: candidate, absDa, chipHits, outsideAmt, pillHits }
     }
   }
 
@@ -209,7 +228,7 @@ function repairChip(
   // parameter is non-vestigial when callers wire scaled pill height through.
   void halfHeight
 
-  return (bestPerfect?.spec) ?? (bestNoChipChip?.spec) ?? (bestAny?.spec) ?? rayAnchor(id, angle, HW)
+  return bestT0?.spec ?? bestT1?.spec ?? bestT2?.spec ?? bestT3?.spec ?? rayAnchor(id, angle, HW)
 }
 
 // Layout for the chips that surround an opened pill.

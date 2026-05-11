@@ -222,14 +222,21 @@ export function Stage(props: StageProps) {
       }
 
       // Push-out pass — when a pill is open, any teammate whose slot rect
-      // overlaps a chip rect is shifted just far enough to clear. The repair
-      // pass in layout.ts already avoids chip-chip overlap; pill-vs-chip
-      // overlap is fixed here, per-frame, so the displacement reverses the
-      // instant the open pill closes (next tick snaps everyone back).
+      // overlaps a chip rect (inflated by CHIP_HALO_PX for comfort) is
+      // shifted just far enough to clear. The repair pass in layout.ts
+      // already avoids chip-chip overlap; pill-vs-chip overlap is fixed
+      // here, per-frame, so the displacement reverses the instant the open
+      // pill closes (next tick snaps everyone back).
       //
-      // Three resolution iterations: a pill caught between two adjacent chips
-      // may have its first axis-resolution put it back into a sibling chip,
-      // so we keep nudging until stable (with a cap to bound the work).
+      // Inflating the chip rect with a halo means neighbours land with
+      // comfortable visual clearance, not just barely-non-overlapping. 12 px
+      // is roughly the same as the connector-line gap between pill and chip
+      // (CHIP_GAP in layout.ts), so the visual rhythm reads consistently.
+      //
+      // Up to 4 iterations: a pill caught between two adjacent chips may
+      // have its first axis-resolution put it back into a sibling chip, so
+      // we keep nudging until stable (capped to bound the work).
+      const CHIP_HALO_PX = 12
       const chipRects = openChipRectsRef.current
       if (openIdxNow >= 0 && chipRects.length > 0) {
         for (let i = 0; i < arr.length; i++) {
@@ -237,20 +244,27 @@ export function Stage(props: StageProps) {
           const hw = halfWidthsRef.current[i]
           if (!hw) continue
           let px = arr[i].x, py = arr[i].y
-          for (let pass = 0; pass < 3; pass++) {
+          for (let pass = 0; pass < 4; pass++) {
             let moved = false
             for (const cr of chipRects) {
+              // Inflated rect — testing against this evicts the pill so the
+              // chip ends up with HALO clearance on every side, not zero.
+              const halo: Rect = {
+                l: cr.l - CHIP_HALO_PX, r: cr.r + CHIP_HALO_PX,
+                t: cr.t - CHIP_HALO_PX, b: cr.b + CHIP_HALO_PX,
+              }
               const r = pillRect(px, py, hw, ctx.halfHeight)
-              if (!rectsIntersect(r, cr)) continue
-              const ccx = (cr.l + cr.r) / 2
-              const ccy = (cr.t + cr.b) / 2
-              const halfW = (cr.r - cr.l) / 2 + hw
-              const halfH = (cr.b - cr.t) / 2 + ctx.halfHeight
+              if (!rectsIntersect(r, halo)) continue
+              const ccx = (halo.l + halo.r) / 2
+              const ccy = (halo.t + halo.b) / 2
+              const halfW = (halo.r - halo.l) / 2 + hw
+              const halfH = (halo.b - halo.t) / 2 + ctx.halfHeight
               const overlapX = halfW - Math.abs(px - ccx)
               const overlapY = halfH - Math.abs(py - ccy)
               if (overlapX <= 0 || overlapY <= 0) continue
-              // Resolve along the shorter axis with a small visible gap.
-              const GAP = 4
+              // Resolve along the shorter axis with a small additional gap
+              // so the next iteration doesn't ping-pong on rounding.
+              const GAP = 2
               if (overlapX < overlapY) {
                 px += (px >= ccx ? 1 : -1) * (overlapX + GAP)
               } else {

@@ -183,7 +183,7 @@ interface GameStore {
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
-const STORAGE_VERSION = 7
+const STORAGE_VERSION = 8
 const STORAGE_KEY     = 'ust-game'
 
 // ─── Initial seeds ────────────────────────────────────────────────────────────
@@ -1216,12 +1216,15 @@ export const useGameStore = create<GameStore>()(
         // session predating v5 is dropped and the user starts fresh.
         const dropping = fromVersion < 5
         // v5 → v6 introduced teamsLog / scheduledGamesLog.
-        // v6 → v7 swapped the demo seed (BUML 2026-05-11 + the real Lizards /
-        // Gooselings rosters now sit at the top; AUDL + Championship removed).
-        // Either way we reseed unconditionally — any user-added teams or
-        // scheduled games on a pre-v7 payload are dropped on purpose, since
-        // there are no production users yet.
-        const needsSeed = fromVersion < 7 || !obj.teamsLog || !obj.scheduledGamesLog
+        // v6 → v7 swapped the demo seed (BUML 2026-05-11 + real Lizards /
+        // Gooselings rosters; AUDL + Championship removed).
+        // v7 → v8 forces a re-seed for any payload still carrying the
+        // pre-trim demo data (AUDL / Championship). Some sessions had
+        // already been migrated to v7 against a stale build, so we bump the
+        // version to make absolutely sure every dev install picks up the
+        // current seed. Any user-added teams / scheduled games on a pre-v8
+        // payload are dropped on purpose — no production users yet.
+        const needsSeed = fromVersion < 8 || !obj.teamsLog || !obj.scheduledGamesLog
         const seed = needsSeed ? seedTeamsAndGames() : null
         return {
           ...obj,
