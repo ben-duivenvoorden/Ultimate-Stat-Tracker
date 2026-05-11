@@ -167,7 +167,7 @@ export type UiMode =
   | 'intercept-pick'     // recorder tapped "Intercepted by Defence", picking interceptor
   | 'receiver-error-pick' // recorder tapped "Receiver Error", picking player who had error
 
-export type AppScreen = 'game-setup' | 'game-settings' | 'line-selection' | 'live-entry'
+export type AppScreen = 'game-setup' | 'game-settings' | 'line-selection' | 'live-entry' | 'teams-manager'
 
 // ─── Transient banner notification ────────────────────────────────────────────
 // Shared by copy / paste / edit-commit flows. One banner at a time; tap to
@@ -227,6 +227,12 @@ export interface GameConfig {
   id: GameId
   name: string
   scheduledTime: string
+  /** Global identifiers for the team currently slotted as positional A/B in
+   *  this game. The live `teams` + `rosters` below are resolved from the
+   *  teamsLog by `resolveSession` on every read — these two fields are the
+   *  durable reference. */
+  teamAGlobalId: number
+  teamBGlobalId: number
   teams: Record<TeamId, Team>
   rosters: Record<TeamId, Player[]>
   halfTimeAt: number

@@ -28,8 +28,25 @@ import {
   type RawEventInput,
 } from './engine'
 import { PICK_MODES, isPickMode } from './pickModes'
-import { MOCK_GAMES } from './data'
+import { seedTeamsAndGames } from './data'
 import { buildEnvelope, serialize, tryParse } from './clipboard'
+import type { TeamEvent, TeamEventInput, GlobalTeamId } from './teams/types'
+import type { ScheduledGameEvent, ScheduledGameEventInput } from './games/types'
+import { deriveTeamsState } from './teams/engine'
+import { deriveScheduledGamesState, resolveGameConfig } from './games/engine'
+import {
+  addTeam as buildAddTeam,
+  editTeam as buildEditTeam,
+  archiveTeam as buildArchiveTeam,
+  addPlayer as buildAddPlayer,
+  editPlayer as buildEditPlayer,
+  removePlayer as buildRemovePlayer,
+} from './teams/actions'
+import {
+  addScheduledGame as buildAddScheduledGame,
+  editScheduledGame as buildEditScheduledGame,
+  cancelScheduledGame as buildCancelScheduledGame,
+} from './games/actions'
 
 // ─── Store shape ──────────────────────────────────────────────────────────────
 // Keep this minimal — game state derives from session.rawLog via the engine.
@@ -38,6 +55,12 @@ import { buildEnvelope, serialize, tryParse } from './clipboard'
 interface GameStore {
   // Persisted
   session: GameSession | null
+  /** Append-only teams + players log (mirrors session.rawLog). Seeded from
+   *  `seedTeamsAndGames()` on first boot. Never mutated — every CRUD action
+   *  appends a new event. */
+  teamsLog: TeamEvent[]
+  /** Append-only scheduled-games log. Same pattern as `teamsLog`. */
+  scheduledGamesLog: ScheduledGameEvent[]
   screen: AppScreen
   isInjurySub: boolean
   uiMode: UiMode
@@ -115,25 +138,125 @@ interface GameStore {
   setEditRange: (fromId: EventId, toId: EventId) => void
   commitEdit:   () => void
   cancelEdit:   () => void
+
+  // ── Teams + scheduled games management (append-only) ──────────────────────
+  // Every CRUD funnels through the appendTeam/Game helpers — never a direct
+  // mutation. Return ids so the caller can wire them into follow-up state
+  // (e.g. select the freshly-created team in a picker).
+  addTeam:             (name: string, short: string, color: string) => GlobalTeamId
+  editTeam:            (teamId: GlobalTeamId, patch: { name?: string; short?: string; color?: string }) => void
+  archiveTeam:         (teamId: GlobalTeamId) => void
+  addPlayer:           (
+    teamId: GlobalTeamId,
+    name: string,
+    gender: 'M' | 'F',
+    extras?: { jerseyNumber?: number; photoUrl?: string },
+  ) => PlayerId
+  editPlayer:          (
+    playerId: PlayerId,
+    patch: { name?: string; gender?: 'M' | 'F'; jerseyNumber?: number | null; photoUrl?: string | null },
+  ) => void
+  removePlayer:        (playerId: PlayerId) => void
+
+  addScheduledGame:    (args: {
+    name: string
+    scheduledTime: string
+    teamAGlobalId: GlobalTeamId
+    teamBGlobalId: GlobalTeamId
+    halfTimeAt: number
+    scoreCapAt: number
+  }) => number
+  editScheduledGame:   (gameId: number, patch: {
+    name?: string
+    scheduledTime?: string
+    teamAGlobalId?: GlobalTeamId
+    teamBGlobalId?: GlobalTeamId
+    halfTimeAt?: number
+    scoreCapAt?: number
+  }) => void
+  cancelScheduledGame: (gameId: number) => void
+
+  // Navigation to / from the Teams Manager screen.
+  openTeamsManager:    () => void
+  closeTeamsManager:   () => void
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
-const STORAGE_VERSION = 5
+const STORAGE_VERSION = 6
 const STORAGE_KEY     = 'ust-game'
+
+// ─── Initial seeds ────────────────────────────────────────────────────────────
+// `seedTeamsAndGames()` produces deterministic id 1.. events; the same seed
+// is consumed by the migration so v5 → v6 upgrades inherit the same world.
+
+const INITIAL_SEED = seedTeamsAndGames()
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function freshSession(gameId: number, pullingTeam: TeamId): GameSession | null {
-  const config = MOCK_GAMES.find(g => g.id === gameId)
-  if (!config) return null
-  // The active line lives in the rawLog (point-start carries lineA/lineB).
-  // freshSession only sets up the empty session shell.
+/** Build a fresh session for a given game by resolving the live teams + game
+ *  logs. Returns null if the game is unknown or has been cancelled. */
+function freshSession(
+  gameId: number,
+  pullingTeam: TeamId,
+  teamsLog: TeamEvent[],
+  scheduledGamesLog: ScheduledGameEvent[],
+): GameSession | null {
+  const gamesState = deriveScheduledGamesState(scheduledGamesLog)
+  const game = gamesState.gamesById.get(gameId)
+  if (!game) return null
+  const teamsState = deriveTeamsState(teamsLog)
+  const config = resolveGameConfig(game, teamsState)
   return {
     gameConfig:           config,
     gameStartPullingTeam: pullingTeam,
     rawLog:               [],
   }
+}
+
+/** Append-only writer for the teams log. Mirrors `appendEvents` in engine.ts. */
+function appendTeamEvents(log: TeamEvent[], inputs: TeamEventInput[]): TeamEvent[] {
+  const startId = log.length === 0 ? 1 : log[log.length - 1].id + 1
+  const ts = Date.now()
+  const stamped: TeamEvent[] = inputs.map((e, i) => ({ ...e, id: startId + i, timestamp: ts } as TeamEvent))
+  return [...log, ...stamped]
+}
+
+function appendScheduledGameEvents(
+  log: ScheduledGameEvent[], inputs: ScheduledGameEventInput[],
+): ScheduledGameEvent[] {
+  const startId = log.length === 0 ? 1 : log[log.length - 1].id + 1
+  const ts = Date.now()
+  const stamped: ScheduledGameEvent[] = inputs.map((e, i) =>
+    ({ ...e, id: startId + i, timestamp: ts } as ScheduledGameEvent))
+  return [...log, ...stamped]
+}
+
+/** Next globally-unique GlobalTeamId — one past the max already in the log,
+ *  including archived teams (we never reuse ids). */
+function nextGlobalTeamId(log: TeamEvent[]): GlobalTeamId {
+  let max = 0
+  for (const e of log) {
+    if (e.type === 'team-add' && e.teamId > max) max = e.teamId
+  }
+  return max + 1
+}
+
+/** Next globally-unique PlayerId — same reasoning. */
+function nextGlobalPlayerId(log: TeamEvent[]): PlayerId {
+  let max = 0
+  for (const e of log) {
+    if (e.type === 'player-add' && e.playerId > max) max = e.playerId
+  }
+  return max + 1
+}
+
+function nextGameId(log: ScheduledGameEvent[]): number {
+  let max = 0
+  for (const e of log) {
+    if (e.type === 'game-add' && e.gameId > max) max = e.gameId
+  }
+  return max + 1
 }
 
 /** Default seed for the line-selection screen on a *fresh* point: first 4 males + 3 females. */
@@ -281,23 +404,28 @@ export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
       // Initial state
-      session:          null,
-      screen:           'game-setup',
-      isInjurySub:      false,
-      uiMode:           'idle',
-      selPuller:        null,
-      showEventMenu:    false,
-      truncateCursor:   null,
-      notification:     null,
-      editMode:         null,
-      recordingOptions: DEFAULT_RECORDING_OPTIONS,
-      swapSides:        false,
-      pillSize:         'md',
+      session:           null,
+      teamsLog:          INITIAL_SEED.teamEvents,
+      scheduledGamesLog: INITIAL_SEED.gameEvents,
+      screen:            'game-setup',
+      isInjurySub:       false,
+      uiMode:            'idle',
+      selPuller:         null,
+      showEventMenu:     false,
+      truncateCursor:    null,
+      notification:      null,
+      editMode:          null,
+      recordingOptions:  DEFAULT_RECORDING_OPTIONS,
+      swapSides:         false,
+      pillSize:          'md',
 
       // ── selectGame ──────────────────────────────────────────────────────────
-      // Start a fresh game session (overwrites any existing one).
+      // Start a fresh game session (overwrites any existing one). Resolves
+      // teams + rosters from the live teamsLog at the moment of creation —
+      // subsequent reads via `resolveSession` re-resolve on every render.
       selectGame(gameId, pullingTeam) {
-        const session = freshSession(gameId, pullingTeam)
+        const { teamsLog, scheduledGamesLog } = get()
+        const session = freshSession(gameId, pullingTeam, teamsLog, scheduledGamesLog)
         if (!session) return
         set({
           session,
@@ -998,6 +1126,77 @@ export const useGameStore = create<GameStore>()(
       cancelEdit() {
         set({ editMode: null, truncateCursor: null, selPuller: null, uiMode: 'idle' })
       },
+
+      // ── Teams CRUD (all append-only) ───────────────────────────────────────
+      // Every action funnels through `appendTeamEvents` — never a direct
+      // mutation. The returned id lets the caller wire fresh entities into
+      // follow-up UI state (e.g. select a just-created team in a picker).
+
+      addTeam(name, short, color) {
+        const id = nextGlobalTeamId(get().teamsLog)
+        set(s => ({ teamsLog: appendTeamEvents(s.teamsLog, [buildAddTeam(id, name, short, color)]) }))
+        return id
+      },
+
+      editTeam(teamId, patch) {
+        set(s => ({ teamsLog: appendTeamEvents(s.teamsLog, [buildEditTeam(teamId, patch)]) }))
+      },
+
+      archiveTeam(teamId) {
+        set(s => ({ teamsLog: appendTeamEvents(s.teamsLog, [buildArchiveTeam(teamId)]) }))
+      },
+
+      addPlayer(teamId, name, gender, extras) {
+        const id = nextGlobalPlayerId(get().teamsLog)
+        set(s => ({
+          teamsLog: appendTeamEvents(s.teamsLog, [buildAddPlayer(id, teamId, name, gender, extras ?? {})]),
+        }))
+        return id
+      },
+
+      editPlayer(playerId, patch) {
+        set(s => ({ teamsLog: appendTeamEvents(s.teamsLog, [buildEditPlayer(playerId, patch)]) }))
+      },
+
+      removePlayer(playerId) {
+        set(s => ({ teamsLog: appendTeamEvents(s.teamsLog, [buildRemovePlayer(playerId)]) }))
+      },
+
+      // ── Scheduled-games CRUD ───────────────────────────────────────────────
+
+      addScheduledGame(args) {
+        const id = nextGameId(get().scheduledGamesLog)
+        set(s => ({
+          scheduledGamesLog: appendScheduledGameEvents(s.scheduledGamesLog, [
+            buildAddScheduledGame({ gameId: id, ...args }),
+          ]),
+        }))
+        return id
+      },
+
+      editScheduledGame(gameId, patch) {
+        set(s => ({
+          scheduledGamesLog: appendScheduledGameEvents(s.scheduledGamesLog, [
+            buildEditScheduledGame(gameId, patch),
+          ]),
+        }))
+      },
+
+      cancelScheduledGame(gameId) {
+        set(s => ({
+          scheduledGamesLog: appendScheduledGameEvents(s.scheduledGamesLog, [
+            buildCancelScheduledGame(gameId),
+          ]),
+        }))
+      },
+
+      // ── Teams Manager navigation ───────────────────────────────────────────
+      openTeamsManager() {
+        set({ screen: 'teams-manager', showEventMenu: false })
+      },
+      closeTeamsManager() {
+        set({ screen: 'game-setup' })
+      },
     }),
     {
       name:    STORAGE_KEY,
@@ -1005,31 +1204,44 @@ export const useGameStore = create<GameStore>()(
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted, fromVersion) => {
         const obj = persisted as {
-          recordingOptions?: Partial<RecordingOptions>
-          session?: unknown
-          screen?: AppScreen
+          recordingOptions?:   Partial<RecordingOptions>
+          session?:            unknown
+          screen?:             AppScreen
+          teamsLog?:           TeamEvent[]
+          scheduledGamesLog?:  ScheduledGameEvent[]
         }
         // v4 changed PlayerId / EventId from string to number; v5 derived
         // activeLine from rawLog and reshaped point-start / injury-sub events.
         // Both transitions are not back-compatible at the event level, so any
         // session predating v5 is dropped and the user starts fresh.
         const dropping = fromVersion < 5
+        // v5 → v6 introduced teamsLog / scheduledGamesLog. Pre-v6 payloads
+        // have neither; seed them so existing in-progress sessions resolve
+        // through the freshly-seeded logs. The session itself keeps its
+        // `gameConfig.id` reference — `resolveSession` looks it up via the
+        // scheduled-games log now (seeded with the same ids).
+        const needsSeed = fromVersion < 6 || !obj.teamsLog || !obj.scheduledGamesLog
+        const seed = needsSeed ? seedTeamsAndGames() : null
         return {
           ...obj,
-          session:          dropping ? null            : (obj.session ?? null),
-          screen:           dropping ? 'game-setup'    : (obj.screen ?? 'game-setup'),
-          recordingOptions: { ...DEFAULT_RECORDING_OPTIONS, ...(obj.recordingOptions ?? {}) },
+          session:           dropping ? null            : (obj.session ?? null),
+          screen:            dropping ? 'game-setup'    : (obj.screen ?? 'game-setup'),
+          teamsLog:          seed ? seed.teamEvents : obj.teamsLog!,
+          scheduledGamesLog: seed ? seed.gameEvents : obj.scheduledGamesLog!,
+          recordingOptions:  { ...DEFAULT_RECORDING_OPTIONS, ...(obj.recordingOptions ?? {}) },
         }
       },
       partialize: (state) => ({
-        session:          state.session,
-        screen:           state.screen,
-        isInjurySub:      state.isInjurySub,
-        uiMode:           state.uiMode,
-        selPuller:        state.selPuller,
-        recordingOptions: state.recordingOptions,
-        swapSides:        state.swapSides,
-        pillSize:         state.pillSize,
+        session:           state.session,
+        teamsLog:          state.teamsLog,
+        scheduledGamesLog: state.scheduledGamesLog,
+        screen:            state.screen,
+        isInjurySub:       state.isInjurySub,
+        uiMode:            state.uiMode,
+        selPuller:         state.selPuller,
+        recordingOptions:  state.recordingOptions,
+        swapSides:         state.swapSides,
+        pillSize:          state.pillSize,
       }),
     },
   ),

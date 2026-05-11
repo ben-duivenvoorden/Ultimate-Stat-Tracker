@@ -3,6 +3,7 @@ import GameSetup from '@/screens/GameSetup'
 import GameSettings from '@/screens/GameSettings'
 import LineSelection from '@/screens/LineSelection'
 import LiveEntry from '@/screens/LiveEntry'
+import TeamsManager from '@/screens/TeamsManager'
 import { RotateOverlay } from '@/components/RotateOverlay'
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
     <div className="h-full w-full bg-bg text-content font-sans overflow-hidden">
       {effective === 'game-setup'     && <GameSetup />}
       {effective === 'game-settings'  && <GameSettings />}
+      {effective === 'teams-manager'  && <TeamsManager />}
       {effective === 'line-selection' && <LineSelection />}
       {effective === 'live-entry'     && <LiveEntry />}
       <RotateOverlay />

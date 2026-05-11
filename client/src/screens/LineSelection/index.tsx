@@ -4,7 +4,7 @@ import { Chip } from '@/components/ui/Chip'
 import { Label } from '@/components/ui/Label'
 import { useSession, useDerivedState, useRecordingOptions } from '@/core/selectors'
 import { useGameStore, seedDefaultLine } from '@/core/store'
-import type { Player, GameMode } from '@/core/types'
+import type { Player, GameMode, TeamId } from '@/core/types'
 
 export default function LineSelection() {
   const session        = useSession()
@@ -14,6 +14,8 @@ export default function LineSelection() {
   const backToGameList = useGameStore(s => s.backToGameList)
   const swapSides      = useGameStore(s => s.swapSides)
   const toggleSwap     = useGameStore(s => s.toggleSwapSides)
+  const openTeamsManager = useGameStore(s => s.openTeamsManager)
+  const addPlayer      = useGameStore(s => s.addPlayer)
   const { lineRatio, gameMode } = useRecordingOptions()
 
   const rosters = session?.gameConfig.rosters
@@ -90,14 +92,24 @@ export default function LineSelection() {
         <span className="w-5" aria-hidden />
       </div>
 
-      {/* Row 2: title (well clear of the back arrow) + Confirm button. */}
+      {/* Row 2: title (well clear of the back arrow) + Manage teams + Confirm button. */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-border">
         <Label block>
           {isInjurySub ? 'INJURY SUBSTITUTION — MID-POINT' : 'LINE SELECTION'}
         </Label>
-        <Btn variant="primary" size="md" onClick={onConfirmClick}>
-          {isInjurySub ? 'Confirm Substitutions' : 'Confirm Line'}
-        </Btn>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={openTeamsManager}
+            className="text-[10px] font-mono tracking-widest uppercase cursor-pointer transition-colors hover:text-content"
+            style={{ color: 'var(--color-muted)' }}
+            title="Manage teams + players"
+          >
+            ⚙ Manage teams
+          </button>
+          <Btn variant="primary" size="md" onClick={onConfirmClick}>
+            {isInjurySub ? 'Confirm Substitutions' : 'Confirm Line'}
+          </Btn>
+        </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -115,29 +127,47 @@ export default function LineSelection() {
           ⇆
         </button>
 
-        <TeamColumn
-          players={rosters[swapSides ? 'B' : 'A']}
-          selected={swapSides ? selB : selA}
-          color={teams[swapSides ? 'B' : 'A'].color}
-          label={teams[swapSides ? 'B' : 'A'].name}
-          onToggle={p => toggle(p, swapSides ? selB : selA, swapSides ? setSelB : setSelA)}
-          onSetAll={swapSides ? setSelB : setSelA}
-          gameMode={gameMode}
-          targetM={lineRatio.M}
-          targetF={lineRatio.F}
-        />
-        <TeamColumn
-          players={rosters[swapSides ? 'A' : 'B']}
-          selected={swapSides ? selA : selB}
-          color={teams[swapSides ? 'A' : 'B'].color}
-          label={teams[swapSides ? 'A' : 'B'].name}
-          onToggle={p => toggle(p, swapSides ? selA : selB, swapSides ? setSelA : setSelB)}
-          onSetAll={swapSides ? setSelA : setSelB}
-          align="right"
-          gameMode={gameMode}
-          targetM={lineRatio.M}
-          targetF={lineRatio.F}
-        />
+        {(() => {
+          const leftSlot:  TeamId = swapSides ? 'B' : 'A'
+          const rightSlot: TeamId = swapSides ? 'A' : 'B'
+          const globalIdFor = (slot: TeamId) =>
+            slot === 'A' ? session!.gameConfig.teamAGlobalId : session!.gameConfig.teamBGlobalId
+          return (
+            <>
+              <TeamColumn
+                players={rosters[leftSlot]}
+                selected={swapSides ? selB : selA}
+                color={teams[leftSlot].color}
+                label={teams[leftSlot].name}
+                onToggle={p => toggle(p, swapSides ? selB : selA, swapSides ? setSelB : setSelA)}
+                onSetAll={swapSides ? setSelB : setSelA}
+                gameMode={gameMode}
+                targetM={lineRatio.M}
+                targetF={lineRatio.F}
+                onAddPlayer={(name, gender, jersey) =>
+                  addPlayer(globalIdFor(leftSlot), name, gender,
+                    jersey !== undefined ? { jerseyNumber: jersey } : undefined)
+                }
+              />
+              <TeamColumn
+                players={rosters[rightSlot]}
+                selected={swapSides ? selA : selB}
+                color={teams[rightSlot].color}
+                label={teams[rightSlot].name}
+                onToggle={p => toggle(p, swapSides ? selA : selB, swapSides ? setSelA : setSelB)}
+                onSetAll={swapSides ? setSelA : setSelB}
+                align="right"
+                gameMode={gameMode}
+                targetM={lineRatio.M}
+                targetF={lineRatio.F}
+                onAddPlayer={(name, gender, jersey) =>
+                  addPlayer(globalIdFor(rightSlot), name, gender,
+                    jersey !== undefined ? { jerseyNumber: jersey } : undefined)
+                }
+              />
+            </>
+          )
+        })()}
       </div>
 
       {overrideOpen && (
@@ -197,11 +227,12 @@ interface TeamColumnProps {
   gameMode: GameMode
   targetM: number
   targetF: number
+  onAddPlayer: (name: string, gender: 'M' | 'F', jerseyNumber?: number) => void
 }
 
 function TeamColumn({
   players, selected, color, label, onToggle, onSetAll, align,
-  gameMode, targetM, targetF,
+  gameMode, targetM, targetF, onAddPlayer,
 }: TeamColumnProps) {
   const isRight = align === 'right'
   const total  = selected.length
@@ -261,7 +292,7 @@ function TeamColumn({
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2 relative">
         {[...players].sort((a, b) => a.name.localeCompare(b.name)).map(p => {
           const isOn = !!selected.find(s => s.id === p.id)
           return (
@@ -318,6 +349,88 @@ function TeamColumn({
             </button>
           )
         })}
+        <AddPlayerRow color={color} onAdd={onAddPlayer} gameMode={gameMode} isRight={isRight} />
+      </div>
+    </div>
+  )
+}
+
+function AddPlayerRow({ color, onAdd, gameMode, isRight }: {
+  color:    string
+  onAdd:    (name: string, gender: 'M' | 'F', jersey?: number) => void
+  gameMode: GameMode
+  isRight:  boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [gender, setGender] = useState<'M' | 'F'>('M')
+  const [jersey, setJersey] = useState('')
+
+  const reset = () => { setName(''); setJersey(''); setGender('M'); setOpen(false) }
+  const submit = () => {
+    const n = name.trim()
+    if (!n) return
+    const j = jersey === '' ? undefined : Number(jersey)
+    onAdd(n, gender, j)
+    reset()
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="h-13 px-4 rounded-lg border border-dashed cursor-pointer transition-colors flex items-center justify-center"
+        style={{
+          color, borderColor: `${color}55`, background: `${color}0a`, height: 52,
+          flexDirection: isRight ? 'row-reverse' : 'row',
+        }}
+        title="Add a new player to this team"
+      >
+        <span className="text-sm font-semibold">+ Add player</span>
+      </button>
+    )
+  }
+
+  return (
+    <div
+      className="p-2 rounded-lg border flex flex-col gap-2"
+      style={{ background: 'var(--color-surf-2)', borderColor: `${color}55` }}
+    >
+      <input
+        type="text"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') reset() }}
+        placeholder="Player name…"
+        autoFocus
+        className="h-9 px-3 rounded-md border text-sm text-content"
+        style={{ background: 'var(--color-surf)', borderColor: 'var(--color-border-2)' }}
+      />
+      <div className="flex items-center gap-2">
+        {gameMode === 'mixed' && (
+          <select
+            value={gender}
+            onChange={e => setGender(e.target.value as 'M' | 'F')}
+            className="h-9 px-2 rounded-md border text-sm font-mono text-content cursor-pointer"
+            style={{ background: 'var(--color-surf)', borderColor: 'var(--color-border-2)' }}
+          >
+            <option value="M">M</option>
+            <option value="F">F</option>
+          </select>
+        )}
+        <input
+          type="number"
+          value={jersey}
+          onChange={e => setJersey(e.target.value)}
+          placeholder="#"
+          className="w-16 h-9 px-2 rounded-md border text-sm font-mono text-center text-content"
+          style={{ background: 'var(--color-surf)', borderColor: 'var(--color-border-2)' }}
+        />
+        <div className="flex gap-1.5 ml-auto">
+          <Btn variant="ghost"   size="sm" onClick={reset}>Cancel</Btn>
+          <Btn variant="primary" size="sm" onClick={submit} disabled={name.trim().length === 0}>Add</Btn>
+        </div>
       </div>
     </div>
   )

@@ -3,21 +3,33 @@ import { Btn } from '@/components/ui/Btn'
 import { Chip } from '@/components/ui/Chip'
 import { Label } from '@/components/ui/Label'
 import { useGameStore } from '@/core/store'
-import { useSession } from '@/core/selectors'
+import { useScheduledGames, useSession, useTeamsState } from '@/core/selectors'
 import { deriveGameState, deriveGameStatus } from '@/core/engine'
-import { MOCK_GAMES } from '@/core/data'
+import { resolveGameConfig } from '@/core/games/engine'
 import type { TeamId } from '@/core/types'
+import NewGameForm from '@/screens/NewGame'
+
+// Sentinel value for the "+ New Game" row in the left list. Picked far above
+// any plausible GameId.
+const NEW_GAME_SENTINEL = -1
 
 export default function GameSetup() {
   const selectGame       = useGameStore(s => s.selectGame)
   const resumeGame       = useGameStore(s => s.resumeGame)
   const openGameSettings = useGameStore(s => s.openGameSettings)
+  const openTeamsManager = useGameStore(s => s.openTeamsManager)
   const session          = useSession()
+  const games            = useScheduledGames()
+  const teamsState       = useTeamsState()
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [pullingTeam, setPullingTeam] = useState<TeamId | null>(null)
 
-  const game = selectedId ? MOCK_GAMES.find(g => g.id === selectedId) : null
+  const isNewGameSelected = selectedId === NEW_GAME_SENTINEL
+  const scheduledGame = selectedId !== null && !isNewGameSelected
+    ? games.find(g => g.id === selectedId)
+    : null
+  const game = scheduledGame ? resolveGameConfig(scheduledGame, teamsState) : null
 
   // Status and score are derived from the session — never carried as static config.
   // Only the currently-selected game can have a session attached at any one time.
@@ -49,9 +61,30 @@ export default function GameSetup() {
               ⚙
             </button>
           </div>
+          <button
+            onClick={openTeamsManager}
+            className="mt-2 text-[10px] font-mono tracking-widest uppercase cursor-pointer transition-colors hover:text-content"
+            style={{ color: 'var(--color-muted)' }}
+            title="Manage teams + players"
+          >
+            ⚙ Manage teams
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {MOCK_GAMES.map(g => {
+          {/* + New Game row sits at the top so it's the obvious first action
+              after archival days. */}
+          <button
+            onClick={() => { setSelectedId(NEW_GAME_SENTINEL); setPullingTeam(null) }}
+            className="w-full text-left px-4 py-3 border-b border-border transition-colors cursor-pointer"
+            style={{
+              borderLeft: `3px solid ${isNewGameSelected ? 'var(--color-success)' : 'transparent'}`,
+              background: isNewGameSelected ? 'var(--color-surf-2)' : 'transparent',
+            }}
+          >
+            <div className="text-sm font-semibold text-content mb-1.5">+ New Game</div>
+            <Label>Schedule a new fixture</Label>
+          </button>
+          {games.map(g => {
             const isActive = selectedId === g.id
             const rowStatus = (sessionGameId === g.id) ? deriveGameStatus(session) : 'scheduled'
             const isLive    = rowStatus === 'in-progress'
@@ -80,8 +113,13 @@ export default function GameSetup() {
       </div>
 
       {/* ── Detail pane ── */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-5 p-6">
-        {!game ? (
+      <div className="flex-1 flex flex-col items-center justify-center gap-5 p-6 overflow-y-auto">
+        {isNewGameSelected ? (
+          <NewGameForm
+            onCreated={(newId) => { setSelectedId(newId); setPullingTeam(null) }}
+            onCancel={() => setSelectedId(null)}
+          />
+        ) : !game ? (
           <div className="text-center">
             <div className="text-4xl mb-3 opacity-30">🥏</div>
             <Label>Select a game from the list</Label>

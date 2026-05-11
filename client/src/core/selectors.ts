@@ -2,17 +2,51 @@ import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useGameStore, effectiveSession } from './store'
 import { computeVisLog, deriveGameState } from './engine'
-import { MOCK_GAMES } from './data'
+import { deriveTeamsState } from './teams/engine'
+import { deriveScheduledGamesState, resolveGameConfig } from './games/engine'
 import type { DerivedGameState, VisLogEntry, GameSession, RecordingOptions, EventId, Notification, EditModeState } from './types'
+import type { TeamsState } from './teams/types'
+import type { ScheduledGame, ScheduledGameEvent } from './games/types'
+import type { TeamEvent } from './teams/types'
 import { DEFAULT_RECORDING_OPTIONS } from './types'
 
-// Refresh the persisted session's gameConfig from current MOCK_GAMES so
-// roster/config edits flow into existing sessions without a migration.
-// (Active line is derived from rawLog + this fresh roster, so it picks up
-// updated names / portraits automatically.)
-function resolveSession(session: GameSession): GameSession {
-  const fresh = MOCK_GAMES.find(g => g.id === session.gameConfig.id)
-  if (!fresh) return session
+// ─── Teams + scheduled games (derived from the append-only logs) ──────────────
+
+export function useTeamsLog(): TeamEvent[] {
+  return useGameStore(s => s.teamsLog)
+}
+
+export function useScheduledGamesLog(): ScheduledGameEvent[] {
+  return useGameStore(s => s.scheduledGamesLog)
+}
+
+export function useTeamsState(): TeamsState {
+  const log = useTeamsLog()
+  return useMemo(() => deriveTeamsState(log), [log])
+}
+
+export function useScheduledGames(): ScheduledGame[] {
+  const log = useScheduledGamesLog()
+  return useMemo(() => deriveScheduledGamesState(log).games, [log])
+}
+
+// ─── Session resolution ──────────────────────────────────────────────────────
+// Replaces the old `MOCK_GAMES.find` trick — `resolveSession` re-resolves the
+// gameConfig's teams + rosters from the live teams state on every read, so
+// roster edits flow into existing sessions without a session-shape migration.
+//
+// The active line is then derived from rawLog + this fresh roster, so the
+// recording UI picks up updated names / photos automatically.
+
+function resolveSessionWith(session: GameSession, teamsState: TeamsState, scheduledGames: ScheduledGame[]): GameSession {
+  const game = scheduledGames.find(g => g.id === session.gameConfig.id)
+  if (!game) {
+    // Game has been cancelled / removed from the log — fall back to the stale
+    // gameConfig we have. The session was already created against it, so it's
+    // still internally consistent for replay purposes.
+    return session
+  }
+  const fresh = resolveGameConfig(game, teamsState)
   return { ...session, gameConfig: fresh }
 }
 
@@ -25,14 +59,24 @@ function resolveSession(session: GameSession): GameSession {
 export function useSession(): GameSession | null {
   const stored = useGameStore(s => s.session)
   const draft  = useGameStore(s => s.editMode?.draftSession ?? null)
+  const teamsState = useTeamsState()
+  const scheduledGames = useScheduledGames()
   const active = draft ?? stored
-  return useMemo(() => (active ? resolveSession(active) : null), [active])
+  return useMemo(
+    () => (active ? resolveSessionWith(active, teamsState, scheduledGames) : null),
+    [active, teamsState, scheduledGames],
+  )
 }
 
 /** The persisted live session, ignoring any edit-mode draft. */
 export function useLiveSession(): GameSession | null {
   const stored = useGameStore(s => s.session)
-  return useMemo(() => (stored ? resolveSession(stored) : null), [stored])
+  const teamsState = useTeamsState()
+  const scheduledGames = useScheduledGames()
+  return useMemo(
+    () => (stored ? resolveSessionWith(stored, teamsState, scheduledGames) : null),
+    [stored, teamsState, scheduledGames],
+  )
 }
 
 export function useEditMode(): EditModeState | null {

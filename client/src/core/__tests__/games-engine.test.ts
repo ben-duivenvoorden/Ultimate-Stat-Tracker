@@ -1,0 +1,103 @@
+import { beforeEach, describe, it, expect } from 'vitest'
+import { deriveScheduledGames, deriveScheduledGamesState, resolveGameConfig } from '../games/engine'
+import { deriveTeamsState } from '../teams/engine'
+import type { ScheduledGameEvent } from '../games/types'
+import type { TeamEvent } from '../teams/types'
+
+let counter = 0
+function ev(partial: Omit<ScheduledGameEvent, 'id' | 'timestamp'>): ScheduledGameEvent {
+  return { id: ++counter, timestamp: 0, ...partial } as ScheduledGameEvent
+}
+
+beforeEach(() => { counter = 0 })
+
+describe('deriveScheduledGames', () => {
+  it('empty log returns empty list', () => {
+    expect(deriveScheduledGames([])).toEqual([])
+  })
+
+  it('game-add materialises an active game with cancelled=false', () => {
+    const log: ScheduledGameEvent[] = [
+      ev({ type: 'game-add', gameId: 1, name: 'Final', scheduledTime: '12:00',
+        teamAGlobalId: 1, teamBGlobalId: 2, halfTimeAt: 8, scoreCapAt: 15 }),
+    ]
+    const games = deriveScheduledGames(log)
+    expect(games).toHaveLength(1)
+    expect(games[0]).toMatchObject({ id: 1, name: 'Final', cancelled: false })
+  })
+
+  it('game-edit patches; missing fields untouched', () => {
+    const log: ScheduledGameEvent[] = [
+      ev({ type: 'game-add',  gameId: 1, name: 'Final', scheduledTime: '12:00',
+        teamAGlobalId: 1, teamBGlobalId: 2, halfTimeAt: 8, scoreCapAt: 15 }),
+      ev({ type: 'game-edit', gameId: 1, name: 'Championship Final' }),
+      ev({ type: 'game-edit', gameId: 1, halfTimeAt: 10 }),
+    ]
+    const g = deriveScheduledGamesState(log).gamesById.get(1)!
+    expect(g.name).toBe('Championship Final')
+    expect(g.scheduledTime).toBe('12:00')
+    expect(g.halfTimeAt).toBe(10)
+    expect(g.scoreCapAt).toBe(15)
+  })
+
+  it('game-cancel hides from active list but keeps the byId lookup', () => {
+    const log: ScheduledGameEvent[] = [
+      ev({ type: 'game-add', gameId: 1, name: 'A', scheduledTime: '09:00',
+        teamAGlobalId: 1, teamBGlobalId: 2, halfTimeAt: 8, scoreCapAt: 15 }),
+      ev({ type: 'game-add', gameId: 2, name: 'B', scheduledTime: '11:00',
+        teamAGlobalId: 1, teamBGlobalId: 2, halfTimeAt: 8, scoreCapAt: 15 }),
+      ev({ type: 'game-cancel', gameId: 1 }),
+    ]
+    const s = deriveScheduledGamesState(log)
+    expect(s.games.map(g => g.id)).toEqual([2])
+    expect(s.gamesById.get(1)?.cancelled).toBe(true)
+  })
+
+  it('events targeting unknown gameIds are no-ops', () => {
+    const log: ScheduledGameEvent[] = [
+      ev({ type: 'game-edit',   gameId: 999, name: 'ghost' }),
+      ev({ type: 'game-cancel', gameId: 999 }),
+    ]
+    expect(deriveScheduledGames(log)).toEqual([])
+  })
+})
+
+describe('resolveGameConfig', () => {
+  it('materialises positional Team + roster from a scheduled game + teams state', () => {
+    const teamsLog: TeamEvent[] = [
+      { id: 1, timestamp: 0, type: 'team-add', teamId: 10, name: 'Empire', short: 'NYE', color: '#1f4788' },
+      { id: 2, timestamp: 0, type: 'team-add', teamId: 11, name: 'Breeze', short: 'DCB', color: '#ff6640' },
+      { id: 3, timestamp: 0, type: 'player-add', playerId: 100, teamId: 10, name: 'Alice', gender: 'F' },
+      { id: 4, timestamp: 0, type: 'player-add', playerId: 101, teamId: 11, name: 'Bob',   gender: 'M', jerseyNumber: 7 },
+    ]
+    const gamesLog: ScheduledGameEvent[] = [
+      ev({ type: 'game-add', gameId: 1, name: 'Final', scheduledTime: '12:00',
+        teamAGlobalId: 10, teamBGlobalId: 11, halfTimeAt: 8, scoreCapAt: 15 }),
+    ]
+    const config = resolveGameConfig(
+      deriveScheduledGames(gamesLog)[0],
+      deriveTeamsState(teamsLog),
+    )
+    expect(config.teams.A.name).toBe('Empire')
+    expect(config.teams.A.id).toBe('A')        // positional
+    expect(config.teams.B.id).toBe('B')
+    expect(config.rosters.A).toHaveLength(1)
+    expect(config.rosters.A[0].teamId).toBe('A')
+    expect(config.rosters.B[0].jerseyNumber).toBe(7)
+  })
+
+  it('missing team falls back to placeholder colour (does not crash)', () => {
+    const config = resolveGameConfig(
+      {
+        id: 1, name: 'Orphan', scheduledTime: '12:00',
+        teamAGlobalId: 9999, teamBGlobalId: 9998,
+        halfTimeAt: 8, scoreCapAt: 15, cancelled: false,
+      },
+      deriveTeamsState([]),
+    )
+    expect(config.teams.A.id).toBe('A')
+    expect(config.teams.B.id).toBe('B')
+    expect(config.rosters.A).toEqual([])
+    expect(config.rosters.B).toEqual([])
+  })
+})
