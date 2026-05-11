@@ -4,6 +4,7 @@ import { Chip } from '@/components/ui/Chip'
 import { Label } from '@/components/ui/Label'
 import { useSession, useDerivedState, useRecordingOptions } from '@/core/selectors'
 import { useGameStore, seedDefaultLine } from '@/core/store'
+import { inkOn } from '@/core/contrast'
 import type { Player, GameMode, TeamId } from '@/core/types'
 
 export default function LineSelection() {
@@ -308,10 +309,13 @@ function TeamColumn({
               }}
             >
               <span
-                className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center text-sm text-white border transition-all"
+                className="flex-shrink-0 w-6 h-6 rounded flex items-center justify-center text-sm border transition-all"
                 style={{
                   background:  isOn ? color : 'transparent',
                   borderColor: isOn ? color : 'var(--color-dim)',
+                  // Luminance-aware tick: white on dark colours, dark on
+                  // light colours (e.g. Lizards Eastside in white today).
+                  color:       isOn ? inkOn(color) : 'var(--color-dim)',
                 }}
               >
                 {isOn && '✓'}
