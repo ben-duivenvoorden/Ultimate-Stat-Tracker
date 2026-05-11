@@ -179,11 +179,17 @@ interface GameStore {
   // Navigation to / from the Teams Manager screen.
   openTeamsManager:    () => void
   closeTeamsManager:   () => void
+
+  // ── Debug ────────────────────────────────────────────────────────────────
+  /** Wipe persistence, including any in-progress session, and reseed teams +
+   *  scheduled games from `seedTeamsAndGames()`. Useful when the persisted
+   *  state has drifted from the demo data on disk. */
+  resetAllData:        () => void
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
-const STORAGE_VERSION = 8
+const STORAGE_VERSION = 9
 const STORAGE_KEY     = 'ust-game'
 
 // ─── Initial seeds ────────────────────────────────────────────────────────────
@@ -1197,6 +1203,30 @@ export const useGameStore = create<GameStore>()(
       closeTeamsManager() {
         set({ screen: 'game-setup' })
       },
+
+      // ── Debug: reset all data ──────────────────────────────────────────────
+      // Reseed teams + scheduled games, drop the current session + edit mode,
+      // and bounce to game-setup. The persist middleware writes the new state
+      // out via partialize on the next tick, so a refresh after this lands on
+      // a known-clean state. Useful when localStorage drifts from the demo
+      // seed and the user can't recover via the UI.
+      resetAllData() {
+        const fresh = seedTeamsAndGames()
+        clearNotificationTimer()
+        set({
+          session:           null,
+          teamsLog:          fresh.teamEvents,
+          scheduledGamesLog: fresh.gameEvents,
+          screen:            'game-setup',
+          isInjurySub:       false,
+          uiMode:            'idle',
+          selPuller:         null,
+          showEventMenu:     false,
+          truncateCursor:    null,
+          editMode:          null,
+          notification:      null,
+        })
+      },
     }),
     {
       name:    STORAGE_KEY,
@@ -1218,13 +1248,17 @@ export const useGameStore = create<GameStore>()(
         // v5 → v6 introduced teamsLog / scheduledGamesLog.
         // v6 → v7 swapped the demo seed (BUML 2026-05-11 + real Lizards /
         // Gooselings rosters; AUDL + Championship removed).
-        // v7 → v8 forces a re-seed for any payload still carrying the
-        // pre-trim demo data (AUDL / Championship). Some sessions had
-        // already been migrated to v7 against a stale build, so we bump the
-        // version to make absolutely sure every dev install picks up the
-        // current seed. Any user-added teams / scheduled games on a pre-v8
+        // v7 → v8 forced a re-seed for any payload still carrying the
+        // pre-trim demo data.
+        // v8 → v9 again forces a re-seed AND treats empty-array logs (not
+        // just missing) as needing fresh seed — covered a corruption mode
+        // where a mid-flight write left empty arrays in localStorage at a
+        // current-version stamp, blocking the older migration from ever
+        // firing again. Any user-added teams / scheduled games on a pre-v9
         // payload are dropped on purpose — no production users yet.
-        const needsSeed = fromVersion < 8 || !obj.teamsLog || !obj.scheduledGamesLog
+        const teamsLogMissing = !Array.isArray(obj.teamsLog) || obj.teamsLog.length === 0
+        const gamesLogMissing = !Array.isArray(obj.scheduledGamesLog) || obj.scheduledGamesLog.length === 0
+        const needsSeed = fromVersion < 9 || teamsLogMissing || gamesLogMissing
         const seed = needsSeed ? seedTeamsAndGames() : null
         return {
           ...obj,
@@ -1247,6 +1281,23 @@ export const useGameStore = create<GameStore>()(
         swapSides:         state.swapSides,
         pillSize:          state.pillSize,
       }),
+      // Defensive overlay. The default merge lets `{ teamsLog: [] }` from a
+      // corrupted localStorage clobber the seeded initial state — which is
+      // exactly what manifested as "no teams, no games" after a v8 build.
+      // Treat empty / missing logs in the persisted payload as "keep the
+      // seeded current state" so the user always boots into a usable list.
+      merge: (persisted, current) => {
+        const c = current as GameStore
+        if (!persisted || typeof persisted !== 'object') return c
+        const p = persisted as Partial<GameStore>
+        const teamsLog = (Array.isArray(p.teamsLog) && p.teamsLog.length > 0)
+          ? p.teamsLog
+          : c.teamsLog
+        const scheduledGamesLog = (Array.isArray(p.scheduledGamesLog) && p.scheduledGamesLog.length > 0)
+          ? p.scheduledGamesLog
+          : c.scheduledGamesLog
+        return { ...c, ...p, teamsLog, scheduledGamesLog }
+      },
     },
   ),
 )

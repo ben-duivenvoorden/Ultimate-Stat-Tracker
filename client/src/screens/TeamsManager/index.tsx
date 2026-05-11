@@ -20,6 +20,7 @@ export default function TeamsManager() {
   const addPlayer        = useGameStore(s => s.addPlayer)
   const editPlayer       = useGameStore(s => s.editPlayer)
   const removePlayer     = useGameStore(s => s.removePlayer)
+  const resetAllData     = useGameStore(s => s.resetAllData)
 
   const [selectedId, setSelectedId] = useState<GlobalTeamId | null>(
     teamsState.teams.length > 0 ? teamsState.teams[0].id : null,
@@ -34,17 +35,32 @@ export default function TeamsManager() {
     <div className="h-full flex bg-bg text-content">
       {/* ── Team list ── */}
       <div className="w-64 flex-shrink-0 flex flex-col border-r border-border">
-        <div className="px-4 py-3 border-b border-border flex-shrink-0 flex items-start justify-between">
-          <div>
-            <Label block className="mb-1">TEAMS MANAGER</Label>
-            <div className="text-base font-bold">Roster</div>
+        <div className="px-4 py-3 border-b border-border flex-shrink-0">
+          <div className="flex items-start justify-between">
+            <div>
+              <Label block className="mb-1">TEAMS MANAGER</Label>
+              <div className="text-base font-bold">Roster</div>
+            </div>
+            <button
+              onClick={closeTeamsManager}
+              className="text-muted hover:text-content transition-colors cursor-pointer text-base"
+              title="Done"
+            >
+              Done
+            </button>
           </div>
+          {/* Escape hatch when localStorage drifts from the demo seed. */}
           <button
-            onClick={closeTeamsManager}
-            className="text-muted hover:text-content transition-colors cursor-pointer text-base"
-            title="Done"
+            onClick={() => {
+              if (window.confirm('Reset all teams, players and scheduled games to the demo seed? Any in-progress session will be lost.')) {
+                resetAllData()
+              }
+            }}
+            className="mt-2 text-[10px] font-mono tracking-widest uppercase cursor-pointer transition-colors hover:text-danger"
+            style={{ color: 'var(--color-muted)' }}
+            title="Wipe persisted teams + games and reseed"
           >
-            Done
+            ⚠ Reset all data
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">
