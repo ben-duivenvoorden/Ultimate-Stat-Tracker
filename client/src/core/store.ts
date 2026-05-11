@@ -189,8 +189,10 @@ interface GameStore {
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
-const STORAGE_VERSION = 9
+const STORAGE_VERSION = 10
 const STORAGE_KEY     = 'ust-game'
+/** Tagged at build time so hydration logs identify which bundle is running. */
+const BUILD_MARKER    = 'ust-build-2026-05-11-v10'
 
 // ─── Initial seeds ────────────────────────────────────────────────────────────
 // `seedTeamsAndGames()` produces deterministic id 1.. events; the same seed
@@ -1258,8 +1260,15 @@ export const useGameStore = create<GameStore>()(
         // payload are dropped on purpose — no production users yet.
         const teamsLogMissing = !Array.isArray(obj.teamsLog) || obj.teamsLog.length === 0
         const gamesLogMissing = !Array.isArray(obj.scheduledGamesLog) || obj.scheduledGamesLog.length === 0
-        const needsSeed = fromVersion < 9 || teamsLogMissing || gamesLogMissing
+        const needsSeed = fromVersion < 10 || teamsLogMissing || gamesLogMissing
         const seed = needsSeed ? seedTeamsAndGames() : null
+        console.info('[ust-game] migrate', {
+          build: BUILD_MARKER,
+          fromVersion,
+          teamsLogMissing,
+          gamesLogMissing,
+          reseeded: needsSeed,
+        })
         return {
           ...obj,
           session:           dropping ? null            : (obj.session ?? null),
@@ -1283,20 +1292,47 @@ export const useGameStore = create<GameStore>()(
       }),
       // Defensive overlay. The default merge lets `{ teamsLog: [] }` from a
       // corrupted localStorage clobber the seeded initial state — which is
-      // exactly what manifested as "no teams, no games" after a v8 build.
-      // Treat empty / missing logs in the persisted payload as "keep the
-      // seeded current state" so the user always boots into a usable list.
+      // exactly what manifested as "no teams, no games" after the v8 build.
+      // Treat empty / missing / malformed logs in the persisted payload as
+      // "fall back to INITIAL_SEED directly" so the user can never boot into
+      // an empty list, no matter what's in localStorage.
+      //
+      // Falls back to INITIAL_SEED rather than `current.teamsLog` because
+      // some bundlers can pass a stale `current` here under HMR; reading the
+      // module-level seed constant short-circuits that whole class of bug.
       merge: (persisted, current) => {
         const c = current as GameStore
-        if (!persisted || typeof persisted !== 'object') return c
+        if (!persisted || typeof persisted !== 'object' || Array.isArray(persisted)) {
+          console.warn('[ust-game] merge: persisted state is missing/invalid — falling back to seed')
+          return { ...c, teamsLog: INITIAL_SEED.teamEvents, scheduledGamesLog: INITIAL_SEED.gameEvents }
+        }
         const p = persisted as Partial<GameStore>
         const teamsLog = (Array.isArray(p.teamsLog) && p.teamsLog.length > 0)
           ? p.teamsLog
-          : c.teamsLog
+          : INITIAL_SEED.teamEvents
         const scheduledGamesLog = (Array.isArray(p.scheduledGamesLog) && p.scheduledGamesLog.length > 0)
           ? p.scheduledGamesLog
-          : c.scheduledGamesLog
+          : INITIAL_SEED.gameEvents
+        console.info('[ust-game] merge', {
+          build: BUILD_MARKER,
+          persistedTeamsLogLen:  Array.isArray(p.teamsLog) ? p.teamsLog.length : 'n/a',
+          persistedGamesLogLen:  Array.isArray(p.scheduledGamesLog) ? p.scheduledGamesLog.length : 'n/a',
+          resultTeamsLogLen:     teamsLog.length,
+          resultGamesLogLen:     scheduledGamesLog.length,
+        })
         return { ...c, ...p, teamsLog, scheduledGamesLog }
+      },
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error('[ust-game] hydration error', { build: BUILD_MARKER, error })
+          return
+        }
+        console.info('[ust-game] hydrated', {
+          build:           BUILD_MARKER,
+          teamsLogLen:     state?.teamsLog?.length ?? 0,
+          gamesLogLen:     state?.scheduledGamesLog?.length ?? 0,
+          hasSession:      !!state?.session,
+        })
       },
     },
   ),

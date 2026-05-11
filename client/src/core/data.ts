@@ -110,10 +110,10 @@ const GOOSELINGS_ROSTER: Player[] = [
   player(47, 'Sun Hong Kim',       'B', 'M'),
 ]
 
-// Lizards play in red, Gooselings in maroon (kept just dark enough to read
-// clearly against red on the canvas — the same hue at the same value would
-// blur the two pill outlines together).
-const LIZARDS    = team('A', 'Lizards Eastside', 'LIZ', '#d6263a')
+// Lizards play in white today (the two teams' usual red + maroon were too
+// similar on a dark canvas — white reads cleanly against the maroon as the
+// opposing outline).
+const LIZARDS    = team('A', 'Lizards Eastside', 'LIZ', '#ffffff')
 const GOOSELINGS = team('B', 'Gooselings',       'GSL', '#6e1a1a')
 
 // ─── Seed function ────────────────────────────────────────────────────────────
