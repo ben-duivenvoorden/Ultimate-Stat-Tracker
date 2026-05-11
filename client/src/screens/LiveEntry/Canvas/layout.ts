@@ -145,15 +145,22 @@ function legacyProposals(opts: BuildOpts): { id: ChipId; angle: number }[] {
   ]
 }
 
-// Repair pass — sweep ±150° around `angle` in 15° steps to find a placement
-// where the chip rect fits inside bounds, doesn't overlap any other-pill
-// rect, and doesn't overlap a previously-accepted chip rect.
+// Repair pass — sweep ±150° around `angle` in 15° steps looking for a chip
+// placement that satisfies as many of these constraints as possible:
+//   1. (HARD)  doesn't overlap a previously-accepted chip rect
+//   2. (SOFT)  fits inside the canvas bounds
+//   3. (SOFT)  doesn't overlap another pill's slot rect
 //
-// The sweep deliberately ranges almost a full revolution: when the proposed
-// half of the pill is so cramped that no nearby angle fits (e.g. wide
-// "Receiver Error" chip on a left-edge pill), the chip jumps to a quadrant
-// that has room. Falls back to the proposed angle when no candidate clears
-// all three constraints — degraded but functional rendering.
+// Chip-chip overlap is treated as a hard constraint: two chips on top of
+// each other become unreadable. A chip clipping the bounds, or sitting on
+// top of a teammate pill, is recoverable — the bounds inset is generous and
+// the per-frame pill push-out in Stage.tsx evicts overlapping pills.
+//
+// Tier ordering (best → worst):
+//   tier 0: all soft constraints satisfied (and no chip-chip overlap)
+//   tier 1: chip-chip clear, may clip bounds OR overlap a pill
+//   tier 2: chip-chip overlap (true degraded fallback)
+// Within each tier, smaller |da| (closer to the proposed angle) wins.
 const REPAIR_STEP_DEG = 15
 const REPAIR_MAX_DEG  = 150
 
@@ -165,22 +172,44 @@ function repairChip(
   for (let s = REPAIR_STEP_DEG; s <= REPAIR_MAX_DEG; s += REPAIR_STEP_DEG) {
     candidates.push((s * Math.PI) / 180, -(s * Math.PI) / 180)
   }
-  let fallback: ChipSpec | null = null
+
+  let bestPerfect:    { spec: ChipSpec; absDa: number } | null = null
+  let bestNoChipChip: { spec: ChipSpec; absDa: number; softHits: number } | null = null
+  let bestAny:        { spec: ChipSpec; absDa: number; chipHits: number; softHits: number } | null = null
+
   for (const da of candidates) {
-    const a = angle + da
-    const candidate = rayAnchor(id, a, HW)
+    const candidate = rayAnchor(id, angle + da, HW)
     const r = chipRect(p.pill.x, p.pill.y, candidate)
-    const inside = rectInsideBounds(r, p.bounds, BOUNDS_MARGIN_X, BOUNDS_MARGIN_Y)
+    const inside       = rectInsideBounds(r, p.bounds, BOUNDS_MARGIN_X, BOUNDS_MARGIN_Y)
     const hitsOther    = p.others.some(o => rectsIntersect(o, r))
-    const hitsAccepted = accepted.some(a2 => rectsIntersect(a2, r))
-    if (inside && !hitsOther && !hitsAccepted) return candidate
-    if (!fallback && da === 0) fallback = candidate
+    const hitsAccepted = accepted.reduce((n, a2) => n + (rectsIntersect(a2, r) ? 1 : 0), 0)
+    const softHits     = (inside ? 0 : 1) + (hitsOther ? 1 : 0)
+    const absDa        = Math.abs(da)
+
+    if (hitsAccepted === 0 && softHits === 0) {
+      if (!bestPerfect || absDa < bestPerfect.absDa) bestPerfect = { spec: candidate, absDa }
+    }
+    if (hitsAccepted === 0) {
+      if (!bestNoChipChip
+          || softHits < bestNoChipChip.softHits
+          || (softHits === bestNoChipChip.softHits && absDa < bestNoChipChip.absDa)) {
+        bestNoChipChip = { spec: candidate, absDa, softHits }
+      }
+    }
+    if (!bestAny
+        || hitsAccepted < bestAny.chipHits
+        || (hitsAccepted === bestAny.chipHits && softHits < bestAny.softHits)
+        || (hitsAccepted === bestAny.chipHits && softHits === bestAny.softHits && absDa < bestAny.absDa)) {
+      bestAny = { spec: candidate, absDa, chipHits: hitsAccepted, softHits }
+    }
   }
+
   // halfHeight kept in the signature for future use (e.g. clamp-against-pill);
   // currently only `chipRect` width-pad matters. Reference here so the
   // parameter is non-vestigial when callers wire scaled pill height through.
   void halfHeight
-  return fallback ?? rayAnchor(id, angle, HW)
+
+  return (bestPerfect?.spec) ?? (bestNoChipChip?.spec) ?? (bestAny?.spec) ?? rayAnchor(id, angle, HW)
 }
 
 // Layout for the chips that surround an opened pill.

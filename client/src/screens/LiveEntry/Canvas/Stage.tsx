@@ -4,6 +4,7 @@ import { useGameStore } from '@/core/store'
 import { TAP_THRESH, HH, PILL_SCALE_FACTORS, SLOT_HIT_PADDING, type PillSize } from './constants'
 import {
   pillHalfWidth, pillRect, slotPositions, eventXY, computeArrowPath,
+  chipRect, rectsIntersect,
   type ChipSpec, type Rect, type Vec,
 } from './physics'
 import { buildActions, chipAction, type ChipAction, type ChipId, type Placement } from './layout'
@@ -166,6 +167,28 @@ export function Stage(props: StageProps) {
     halfHeight: scaledHalfHeight,
   }
 
+  // Open pill's chip rects, in canvas-space. Used by the rAF tick to push
+  // surrounding pills out of the way when their slot rect overlaps a chip's
+  // footprint — keeps chips readable even when the rosette is wider than the
+  // available gap between teammates.
+  //
+  // Recomputed whenever the open pill, its chips, or the bounds change.
+  // Half-width changes (measured by ResizeObserver) don't trigger this — the
+  // initial heuristic is close enough, and the rosette re-lays once the
+  // measured width feeds back via the next prop tick.
+  const openChipRectsRef = useRef<Rect[]>([])
+  useEffect(() => {
+    if (openIdx < 0) { openChipRectsRef.current = []; return }
+    const slots = slotPositions(props.bounds)
+    const openSlot = slots[openIdx]
+    const openPlayer = props.players[openIdx]
+    if (!openSlot || !openPlayer) { openChipRectsRef.current = []; return }
+    const chips = chipsForPlayer(openPlayer)
+    openChipRectsRef.current = chips.map(c => chipRect(openSlot.x, openSlot.y, c))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openIdx, props.holderId, props.pullerId, props.mode, props.players, props.bounds,
+      props.stallShown, props.bonusShown, scale])
+
   function applyDOM() {
     const arr = posRef.current
     for (let i = 0; i < arr.length; i++) {
@@ -188,6 +211,7 @@ export function Stage(props: StageProps) {
       const ctx = tickCtx.current
       const slots = slotPositions(ctx.bounds)
       const drag = stateRef.current.dragIdx
+      const openIdxNow = stateRef.current.openIdx
       const arr = posRef.current
       for (let i = 0; i < arr.length; i++) {
         if (i === drag) continue
@@ -195,6 +219,50 @@ export function Stage(props: StageProps) {
         if (!slot) continue
         arr[i].x = slot.x
         arr[i].y = slot.y
+      }
+
+      // Push-out pass — when a pill is open, any teammate whose slot rect
+      // overlaps a chip rect is shifted just far enough to clear. The repair
+      // pass in layout.ts already avoids chip-chip overlap; pill-vs-chip
+      // overlap is fixed here, per-frame, so the displacement reverses the
+      // instant the open pill closes (next tick snaps everyone back).
+      //
+      // Three resolution iterations: a pill caught between two adjacent chips
+      // may have its first axis-resolution put it back into a sibling chip,
+      // so we keep nudging until stable (with a cap to bound the work).
+      const chipRects = openChipRectsRef.current
+      if (openIdxNow >= 0 && chipRects.length > 0) {
+        for (let i = 0; i < arr.length; i++) {
+          if (i === drag || i === openIdxNow) continue
+          const hw = halfWidthsRef.current[i]
+          if (!hw) continue
+          let px = arr[i].x, py = arr[i].y
+          for (let pass = 0; pass < 3; pass++) {
+            let moved = false
+            for (const cr of chipRects) {
+              const r = pillRect(px, py, hw, ctx.halfHeight)
+              if (!rectsIntersect(r, cr)) continue
+              const ccx = (cr.l + cr.r) / 2
+              const ccy = (cr.t + cr.b) / 2
+              const halfW = (cr.r - cr.l) / 2 + hw
+              const halfH = (cr.b - cr.t) / 2 + ctx.halfHeight
+              const overlapX = halfW - Math.abs(px - ccx)
+              const overlapY = halfH - Math.abs(py - ccy)
+              if (overlapX <= 0 || overlapY <= 0) continue
+              // Resolve along the shorter axis with a small visible gap.
+              const GAP = 4
+              if (overlapX < overlapY) {
+                px += (px >= ccx ? 1 : -1) * (overlapX + GAP)
+              } else {
+                py += (py >= ccy ? 1 : -1) * (overlapY + GAP)
+              }
+              moved = true
+            }
+            if (!moved) break
+          }
+          arr[i].x = px
+          arr[i].y = py
+        }
       }
 
       // Update pass arrows (recent at slot 0, previous at slot 1).
